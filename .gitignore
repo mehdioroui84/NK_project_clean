@@ -1,0 +1,15 @@
+# Python/cache
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Runtime outputs and logs
+outputs/
+logs/*
+!logs/.gitkeep
+
+# Large/generated presentation assets
+presentations/assets/
+
+# Local scratch
+tmp/

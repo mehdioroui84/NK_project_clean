@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NK Reference Update: Refined Annotation v1</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5f6b76;
+      --line: #d9e0e7;
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --accent: #1f6feb;
+      --accent2: #d65f31;
+      --green: #16833a;
+      --purple: #6f42c1;
+      --cyan: #0b7285;
+      --gold: #b7791f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    .deck {
+      max-width: 1760px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .slide {
+      width: 100%;
+      min-height: 900px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 24px;
+      padding: 38px 44px 36px;
+      box-shadow: 0 12px 30px rgba(26, 39, 54, 0.08);
+      page-break-after: always;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide::after {
+      content: attr(data-slide);
+      position: absolute;
+      right: 28px;
+      bottom: 18px;
+      color: #9aa7b3;
+      font-size: 13px;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      font-size: 48px;
+      line-height: 1.04;
+      letter-spacing: 0;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 32px;
+      line-height: 1.12;
+      margin-bottom: 20px;
+    }
+
+    h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    p, li {
+      font-size: 18px;
+      line-height: 1.36;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 23px;
+      line-height: 1.3;
+      max-width: 1040px;
+    }
+
+    .takeaway {
+      border-left: 5px solid var(--accent);
+      background: #f0f6ff;
+      padding: 16px 20px;
+      font-size: 20px;
+      line-height: 1.32;
+      margin: 18px 0 24px;
+      font-weight: 700;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .grid2.figure-right {
+      grid-template-columns: minmax(360px, 0.72fr) minmax(760px, 1.28fr);
+      align-items: center;
+    }
+
+    .grid2.figure-left {
+      grid-template-columns: minmax(780px, 1.35fr) minmax(340px, 0.65fr);
+      align-items: center;
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 20px;
+      background: #fbfcfe;
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin: 24px 0;
+    }
+
+    .metric .box {
+      border-top: 5px solid var(--accent);
+      background: #f8fbff;
+      padding: 18px;
+      min-height: 118px;
+    }
+
+    .metric .value {
+      font-size: 34px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .figure {
+      width: 100%;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: white;
+      object-fit: contain;
+    }
+
+    .figure.tall {
+      max-height: 690px;
+    }
+
+    .figure.wide {
+      max-height: 560px;
+    }
+
+    .figure.clean {
+      border: 0;
+      border-radius: 0;
+    }
+
+    .caption {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.25;
+      margin-top: 8px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    .flow .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 158px;
+      background: #fbfcfe;
+    }
+
+    .flow .num {
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .flow .title {
+      font-weight: 800;
+      font-size: 19px;
+      margin-bottom: 8px;
+    }
+
+    .flow .body {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.28;
+    }
+
+    .label-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 16px;
+    }
+
+    .label-table th,
+    .label-table td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .label-table th {
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #174ea6;
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0 6px 6px 0;
+    }
+
+    .pill.green { background: #eaf7ee; color: #146c2e; }
+    .pill.orange { background: #fff3e5; color: #a54a14; }
+    .pill.purple { background: #f2ecff; color: #5f31a8; }
+    .pill.gray { background: #edf0f3; color: #3f4a55; }
+
+    .callouts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .callout {
+      border-left: 5px solid var(--accent2);
+      padding: 14px 16px;
+      background: #fff8f5;
+    }
+
+    .callout.blue {
+      border-color: var(--accent);
+      background: #f0f6ff;
+    }
+
+    .callout.green {
+      border-color: var(--green);
+      background: #f0fbf3;
+    }
+
+    .callout.purple {
+      border-color: var(--purple);
+      background: #f7f2ff;
+    }
+
+    .small {
+      font-size: 16px;
+      color: var(--muted);
+      line-height: 1.28;
+    }
+
+    .tiny {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .two-fig {
+      display: grid;
+      grid-template-columns: minmax(560px, 0.9fr) minmax(720px, 1.1fr);
+      gap: 22px;
+      align-items: center;
+    }
+
+    .two-fig.discovery {
+      grid-template-columns: minmax(320px, 0.46fr) minmax(980px, 1.54fr);
+      align-items: center;
+    }
+
+    .two-fig.discovery .radar-panel .figure {
+      max-height: 430px;
+    }
+
+    .two-fig.discovery .overview-panel .figure {
+      max-height: 720px;
+    }
+
+    .figure-note-row {
+      display: grid;
+      grid-template-columns: minmax(420px, 1.2fr) minmax(420px, 0.8fr);
+      gap: 18px;
+      align-items: start;
+      margin-top: 14px;
+    }
+
+    .figure-full {
+      width: 100%;
+    }
+
+    .figure-full .figure {
+      max-height: 660px;
+      object-fit: contain;
+    }
+
+    .three-fig {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .equation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .equation-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 16px 18px;
+      min-height: 190px;
+    }
+
+    .equation-card h3 {
+      margin-bottom: 8px;
+      font-size: 19px;
+    }
+
+    .math {
+      display: block;
+      overflow-x: auto;
+      padding: 8px 0;
+      font-size: 21px;
+    }
+
+    math {
+      font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+    }
+
+    .speaker {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--line);
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.32;
+    }
+
+    @media print {
+      body { background: white; }
+      .deck { max-width: none; padding: 0; }
+      .slide {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        margin: 0;
+        min-height: 100vh;
+        break-after: page;
+      }
+    }
+  </style>
+</head>
+<body>
+<main class="deck">
+
+  <section class="slide" data-slide="1">
+    <div class="eyebrow">30-minute NK reference update</div>
+    <h1>From batch strategy to refined NK-state annotation v1</h1>
+    <p class="subtitle">
+      We built a terminal-first SCVI/SCANVI workflow, selected an assay-aware batch strategy,
+      used SCVI latent structure for discovery, and locked a first refined annotation map
+      supported by markers and pairwise differential expression.
+    </p>
+    <div class="metric">
+      <div class="box">
+        <div class="value">1.3M</div>
+        <div class="label">merged cells processed from the reference AnnData</div>
+      </div>
+      <div class="box">
+        <div class="value">326K</div>
+        <div class="label">QC/balanced cells used for model evaluation</div>
+      </div>
+      <div class="box">
+        <div class="value">0.4</div>
+        <div class="label">selected Leiden resolution on SCVI latent space</div>
+      </div>
+      <div class="box">
+        <div class="value">v1</div>
+        <div class="label">locked validation-set refined annotation map</div>
+      </div>
+    </div>
+    <div class="takeaway">
+      Main message: the model reproduces known NK states, while SCVI clustering reveals interpretable substructure that improves the current annotation.
+    </div>
+  </section>
+
+  <section class="slide" data-slide="2">
+    <div class="eyebrow">The question</div>
+    <h2>Can we build a robust NK reference and use it to discover better labels?</h2>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Starting challenge</h3>
+        <ul>
+          <li>Data came from many datasets and assay chemistries.</li>
+          <li>Manual labels captured major biology, but several “Unknown” and broad states remained.</li>
+          <li>We needed a workflow that separates technical correction from biological discovery.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Working strategy</h3>
+        <ul>
+          <li>Use `assay_clean` as the production batch key.</li>
+          <li>Train SCANVI for supervised reference performance.</li>
+          <li>Train SCVI for unsupervised latent discovery and Leiden clustering.</li>
+          <li>Use markers and pairwise DE to lock refined labels.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="title">Preprocess</div><div class="body">QC, balance classes, fill missing assay as Flex Gene Expression.</div></div>
+      <div class="step"><div class="num">2</div><div class="title">Model</div><div class="body">SCANVI for labels, SCVI for unsupervised latent structure.</div></div>
+      <div class="step"><div class="num">3</div><div class="title">Cluster</div><div class="body">Leiden on validation-set SCVI latent space across resolutions.</div></div>
+      <div class="step"><div class="num">4</div><div class="title">Interpret</div><div class="body">Cluster composition, curated markers, pairwise DE.</div></div>
+      <div class="step"><div class="num">5</div><div class="title">Lock v1</div><div class="body">Create a cluster-to-refined-label map for the next training pass.</div></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="3">
+    <div class="eyebrow">Batch strategy re-evaluation</div>
+    <h2>Batch correction depends on whether we ask a global or local question</h2>
+    <div class="grid2 figure-right">
+      <div>
+        <div class="takeaway">
+          The clean comparison no longer uses an arbitrary overall score. We show direct metrics for dataset mixing, assay mixing, and NK-state preservation.
+        </div>
+        <ul>
+          <li><strong>ASW mixing</strong> is the global view: do batches separate across the latent space?</li>
+          <li><strong>kNN mixing</strong> is the local view: can nearest neighbors still recover dataset or assay?</li>
+          <li><strong>NK_State ASW/kNN</strong> are biology-preservation guardrails, shown separately.</li>
+          <li>For clustering and discovery, local kNN mixing is the stricter test.</li>
+        </ul>
+      </div>
+      <div>
+        <img class="figure wide" src="../outputs/batch_strategy_reevaluation/batch_strategy_absolute_scores.png" alt="Batch strategy direct metrics" />
+        <p class="caption">
+          Absolute success scores, not relative min-max ranks. Assay-only has strongest global ASW mixing;
+          composite improves local kNN mixing. Biology is reported as separate NK_State ASW and kNN metrics.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="4">
+    <div class="eyebrow">Metric definitions</div>
+    <h2>How the batch and biology scores were defined</h2>
+    <div class="equation-grid">
+      <div class="equation-card">
+        <h3>Silhouette for a label set</h3>
+        <math class="math" display="block">
+          <mrow>
+            <msub><mi>s</mi><mi>i</mi></msub>
+            <mo>=</mo>
+            <mfrac>
+              <mrow><msub><mi>b</mi><mi>i</mi></msub><mo>-</mo><msub><mi>a</mi><mi>i</mi></msub></mrow>
+              <mrow><mi>max</mi><mo>(</mo><msub><mi>a</mi><mi>i</mi></msub><mo>,</mo><msub><mi>b</mi><mi>i</mi></msub><mo>)</mo></mrow>
+            </mfrac>
+          </mrow>
+        </math>
+        <p class="small">
+          Here <em>a<sub>i</sub></em> is the mean distance to cells with the same label and
+          <em>b<sub>i</sub></em> is the nearest mean distance to another label.
+        </p>
+      </div>
+      <div class="equation-card">
+        <h3>NK_State ASW preservation</h3>
+        <math class="math" display="block">
+          <mrow>
+            <msub><mi>S</mi><mtext>NK</mtext></msub>
+            <mo>=</mo>
+            <mfrac>
+              <mrow>
+                <mo>1</mo><mo>+</mo>
+                <mfrac>
+                  <mn>1</mn>
+                  <mi>n</mi>
+                </mfrac>
+                <msubsup><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></msubsup>
+                <msub><mi>s</mi><mi>i</mi></msub><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>)</mo>
+              </mrow>
+              <mn>2</mn>
+            </mfrac>
+          </mrow>
+        </math>
+        <p class="small">Higher means known NK states remain separated in the latent space.</p>
+      </div>
+      <div class="equation-card">
+        <h3>Batch ASW mixing</h3>
+        <math class="math" display="block">
+          <mrow>
+            <msub><mi>M</mi><mtext>ASW</mtext></msub><mo>(</mo><mi>B</mi><mo>)</mo>
+            <mo>=</mo>
+            <mn>1</mn><mo>-</mo>
+            <mrow>
+              <mo>|</mo>
+              <mfrac>
+                <mn>1</mn>
+                <mi>n</mi>
+              </mfrac>
+              <msubsup><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></msubsup>
+              <msub><mi>s</mi><mi>i</mi></msub><mo>(</mo><msub><mi>B</mi><mi>i</mi></msub><mo>)</mo>
+              <mo>|</mo>
+            </mrow>
+          </mrow>
+        </math>
+        <p class="small">Computed within NK_State strata for either <em>B = dataset_id</em> or <em>B = assay_clean</em>. Higher means less global batch separation.</p>
+      </div>
+      <div class="equation-card">
+        <h3>NK_State kNN preservation</h3>
+        <math class="math" display="block">
+          <mrow>
+            <msub><mi>A</mi><mtext>NK-kNN</mtext></msub>
+            <mo>=</mo>
+            <mfrac><mn>1</mn><mi>n</mi></mfrac>
+            <msubsup><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></msubsup>
+            <mi mathvariant="normal">I</mi>
+            <mo>(</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>=</mo><msub><mi>y</mi><mi>i</mi></msub><mo>)</mo>
+          </mrow>
+        </math>
+        <p class="small"><em>ŷ<sub>i</sub></em> is the majority NK_State among the k nearest neighbors of cell <em>i</em>.</p>
+      </div>
+      <div class="equation-card">
+        <h3>Batch kNN mixing</h3>
+        <math class="math" display="block">
+          <mrow>
+            <msub><mi>A</mi><mtext>B-kNN</mtext></msub>
+            <mo>=</mo>
+            <mfrac><mn>1</mn><mi>n</mi></mfrac>
+            <msubsup><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></msubsup>
+            <mi mathvariant="normal">I</mi>
+            <mo>(</mo><msub><mover><mi>B</mi><mo>^</mo></mover><mi>i</mi></msub><mo>=</mo><msub><mi>B</mi><mi>i</mi></msub><mo>)</mo>
+          </mrow>
+        </math>
+        <p class="small"><em>B̂<sub>i</sub></em> is the majority dataset or assay among nearest neighbors, evaluated within NK_State strata.</p>
+      </div>
+      <div class="equation-card">
+        <h3>Baseline-adjusted batch kNN score</h3>
+        <math class="math" display="block">
+          <mrow>
+            <msub><mi>M</mi><mtext>kNN</mtext></msub>
+            <mo>=</mo>
+            <mn>1</mn><mo>-</mo>
+            <mfrac>
+              <mrow><mi>max</mi><mo>(</mo><mn>0</mn><mo>,</mo><msub><mi>A</mi><mtext>B-kNN</mtext></msub><mo>-</mo><msub><mi>A</mi><mtext>base</mtext></msub><mo>)</mo></mrow>
+              <mrow><mn>1</mn><mo>-</mo><msub><mi>A</mi><mtext>base</mtext></msub></mrow>
+            </mfrac>
+          </mrow>
+        </math>
+        <p class="small">Higher means batch is no more locally predictable than the within-NK_State majority-batch baseline.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="5">
+    <div class="eyebrow">Reference model behavior</div>
+    <h2>SCANVI performs well overall, but its errors highlight where biology may be unresolved</h2>
+    <div class="grid2 figure-left">
+      <div>
+        <img class="figure tall" src="../outputs/figures/scanvi_full_umap_panels.png" alt="SCANVI full UMAP panels" />
+      </div>
+      <div>
+        <h3>What this told us</h3>
+        <ul>
+          <li>Major states are learned with high validation performance.</li>
+          <li>Some errors concentrate in specific regions rather than being random.</li>
+          <li>Held-out/zero-shot behavior flagged classes like `Unknown_Lung_3` as poorly learned because almost all examples were in held-out data.</li>
+        </ul>
+        <div class="callout blue">
+          <strong>Decision:</strong> do not force extra batch correction. Use the assay-only latent space as the production baseline and use SCVI for substructure discovery.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="6">
+    <div class="eyebrow">Discovery setup</div>
+    <h2>SCVI Leiden clustering gave us a controlled way to ask: how much structure is hidden inside the labels?</h2>
+    <div class="two-fig discovery">
+      <div class="radar-panel">
+        <img class="figure tall" src="../outputs/leiden_validation/leiden_resolution_radar.png" alt="Leiden resolution radar" />
+        <p class="caption">
+          Resolution tradeoff: ARI/NMI compare Leiden clusters with manual `NK_State`.
+          Silhouette is computed on SCVI latent coordinates using Leiden cluster IDs, not dataset or assay batch labels.
+        </p>
+      </div>
+      <div class="overview-panel">
+        <img class="figure tall" src="../outputs/leiden_validation/validation_leiden_overview.png" alt="Validation Leiden overview" />
+        <p class="caption">Resolution 0.4 was selected as the working balance: not too coarse, not too fragmented.</p>
+      </div>
+    </div>
+    <div class="takeaway">
+      We selected `leiden_0_4`: 21 clusters, interpretable structure, and enough resolution to split broad or unknown states.
+    </div>
+  </section>
+
+  <section class="slide" data-slide="7">
+    <div class="eyebrow">Annotation framework</div>
+    <h2>The final v1 map keeps known biology, then adds marker-supported splits</h2>
+    <div class="figure-full">
+      <img class="figure tall" src="../outputs/markers/validation/leiden_0_4/figures/leiden_0_4_interpretation_umap_cropped.png" alt="Final interpretation UMAP" />
+    </div>
+    <div class="figure-note-row">
+      <div>
+        <h3>Interpretation rule</h3>
+        <p>We only created or renamed states when Leiden structure, cluster composition, marker programs, and pairwise DE pointed in the same direction.</p>
+      </div>
+      <div>
+        <div>
+          <span class="pill green">Preserved core labels</span>
+          <span class="pill">Split cytokine-stimulated cells</span>
+          <span class="pill purple">Resolved major lung unknowns</span>
+          <span class="pill orange">Kept tissue-resident transitional NK</span>
+          <span class="pill gray">Flagged non-NK-like references</span>
+        </div>
+        <p class="small">This is intentionally a validation-set v1 map, not yet the final full-reference annotation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="8">
+    <div class="eyebrow">Marker overview</div>
+    <h2>Curated marker programs made the biological axes visible</h2>
+    <img class="figure wide" src="../outputs/markers/validation/leiden_0_4/leiden_0_4_curated_marker_dotplot.png" alt="Curated marker dotplot" />
+    <div class="callouts">
+      <div class="callout blue">
+        <strong>NK programs:</strong> cytotoxic, regulatory/tissue, interferon/cytokine, and proliferative programs separate cleanly across clusters.
+      </div>
+      <div class="callout">
+        <strong>Reference compartments:</strong> B and T cells are intentional reference classes; myeloid-like and erythroid-like clusters are kept transparent rather than forced into NK labels.
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="9">
+    <div class="eyebrow">Biomarker result 1</div>
+    <h2>Cytokine-stimulated NK cells separate into effector and CCR7+ programs</h2>
+    <div class="grid2 figure-left">
+      <div>
+        <img class="figure wide" src="../outputs/markers/validation/leiden_0_4/pairwise/leiden_0_4_9_vs_12/leiden_0_4_9_vs_12_dotplot.png" alt="Pairwise DE cluster 9 vs 12" />
+      </div>
+      <div>
+        <h3>Locked labels</h3>
+        <p><strong>Cytokine-Stimulated Effector</strong></p>
+        <p class="small">Higher cytotoxic and chemokine markers: `GZMA`, `NKG7`, `CCL4`, `CCL5`, `CCL3`, `KLRB1`.</p>
+        <p><strong>Cytokine-Stimulated CCR7+</strong></p>
+        <p class="small">Higher activation/trafficking markers: `CCR7`, `SELL`, `HSPB1`, `IFITM3`, `CD74`, `IRF4`, `GLUL`, `CALR`.</p>
+        <div class="takeaway">
+          This split recovers two biologically plausible cytokine-response states that were previously collapsed.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="10">
+    <div class="eyebrow">Biomarker result 2</div>
+    <h2>The largest lung-unknown groups are not the same state</h2>
+    <div class="grid2 figure-left">
+      <div>
+        <img class="figure wide" src="../outputs/markers/validation/leiden_0_4/pairwise/leiden_0_4_8_vs_13/leiden_0_4_8_vs_13_dotplot.png" alt="Pairwise DE cluster 8 vs 13" />
+      </div>
+      <div>
+        <h3>Locked labels</h3>
+        <p><strong>Lung Cytotoxic NK</strong></p>
+        <p class="small">Higher cytotoxic program: `FGFBP2`, `FCGR3A`, `GZMB`, `PRF1`, `NKG7`, `GZMH`.</p>
+        <p><strong>Lung GZMK+ XCL1+ NK</strong></p>
+        <p class="small">Higher tissue-activated/transitional program: `GZMK`, `XCL1`, `DUSP4`, `RGS1`, `CD44`, `ITGA1`.</p>
+        <div class="takeaway">
+          The refined v1 annotation turns two broad lung unknowns into marker-defined lung NK states.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="11">
+    <div class="eyebrow">Biomarker result 3</div>
+    <h2>Transitional cytotoxic NK has a tissue-resident branch</h2>
+    <div class="grid2 figure-left">
+      <div>
+        <img class="figure wide" src="../outputs/markers/validation/leiden_0_4/pairwise/leiden_0_4_10_vs_1/leiden_0_4_10_vs_1_dotplot.png" alt="Pairwise DE cluster 10 vs 1" />
+      </div>
+      <div>
+        <h3>How we interpret it</h3>
+        <p><strong>Transitional Cytotoxic</strong> looks more circulating/mobile and cytotoxic.</p>
+        <p class="small">Representative markers: `GNLY`, `FCGR3A`, `SPON2`, `SYNE1`, `SYNE2`, `AHNAK`.</p>
+        <p><strong>Transitional Cytotoxic Tissue-Resident</strong> is enriched for tissue/decidua-associated markers.</p>
+        <p class="small">Representative markers: `XCL1`, `XCL2`, `RGS1`, `KLRC1`, `LGALS1`, `COTL1`, `CAPG`, `TRDC`.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="12">
+    <div class="eyebrow">Final v1 annotation map</div>
+    <h2>What we locked in for validation-set `leiden_0_4`</h2>
+    <table class="label-table">
+      <thead>
+        <tr><th>Cluster(s)</th><th>Refined label</th><th>Why we kept / changed it</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0, 6</td><td>Mature Cytotoxic</td><td>Core cytotoxic NK; mature-cytotoxic branch names intentionally unchanged for now.</td></tr>
+        <tr><td>1</td><td>Transitional Cytotoxic</td><td>Circulating/mobile transitional cytotoxic program.</td></tr>
+        <tr><td>2</td><td>Mature Cytotoxic TCF7+</td><td>`TCF7/IL7R/SELL/GZMK`-type mature-cytotoxic substructure.</td></tr>
+        <tr><td>5</td><td>Mature Cytotoxic Engineered</td><td>CB07/Flex-enriched engineered NK context; name left unchanged for now.</td></tr>
+        <tr><td>7</td><td>Proliferative</td><td>Cell-cycle markers support existing label.</td></tr>
+        <tr><td>8</td><td>Lung Cytotoxic NK</td><td>Strong lung cytotoxic NK markers.</td></tr>
+        <tr><td>9</td><td>Cytokine-Stimulated Effector</td><td>Effector/chemokine cytokine-stimulated state.</td></tr>
+        <tr><td>10, 11</td><td>Transitional Cytotoxic Tissue-Resident</td><td>Pairwise DE supports distinction from circulating transitional cytotoxic.</td></tr>
+        <tr><td>12</td><td>Cytokine-Stimulated CCR7+</td><td>`CCR7/SELL/IRF4/HSPB1/CD74` activation/trafficking-like state.</td></tr>
+        <tr><td>13</td><td>Lung GZMK+ XCL1+ NK</td><td>Lung-enriched tissue-activated/transitional NK markers.</td></tr>
+        <tr><td>14, 18</td><td>Unconventional; Regulatory</td><td>Priority DE supports keeping both distinct.</td></tr>
+        <tr><td>15, 3, 16, 20</td><td>B; T; Unknown_BM_1 Erythroid-like; Myeloid-like</td><td>Reference/non-NK-like compartments kept explicit.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="slide" data-slide="13">
+    <div class="eyebrow">Interpretation and caveats</div>
+    <h2>What this v1 annotation means, and what it does not mean yet</h2>
+    <div class="grid2">
+      <div class="panel">
+        <h3>What we can say now</h3>
+        <ul>
+          <li>The existing annotation captures major NK biology.</li>
+          <li>SCVI latent structure exposes meaningful substructure inside broad states.</li>
+          <li>Pairwise DE supports new labels in cytokine-stimulated, lung, and tissue-resident transitional compartments.</li>
+          <li>The mapping is clear enough to use as the next working annotation.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>What remains cautious</h3>
+        <ul>
+          <li>Some labels are tissue or dataset enriched; that can be real biology, but should be tracked.</li>
+          <li>Validation-set labels are not enough to retrain SCANVI yet.</li>
+          <li>The mature-cytotoxic branch still deserves a later dedicated review.</li>
+          <li>Full-dataset annotation must come before the final retraining pass.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="takeaway">
+      We should treat this as `NK_State_refined_validation_v1`: locked enough to proceed, not final enough to stop validating.
+    </div>
+  </section>
+
+  <section class="slide" data-slide="14">
+    <div class="eyebrow">Next steps</div>
+    <h2>Turn validation-set v1 into a full reference annotation</h2>
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="title">Apply to full data</div><div class="body">Run full-dataset SCVI Leiden / projection strategy and attach refined labels beyond validation cells.</div></div>
+      <div class="step"><div class="num">2</div><div class="title">QC label sizes</div><div class="body">Check class counts, tissue/dataset balance, and whether rare labels are stable enough.</div></div>
+      <div class="step"><div class="num">3</div><div class="title">Retrain SCANVI</div><div class="body">Use `NK_State_refined` with `batch_key = assay_clean`.</div></div>
+      <div class="step"><div class="num">4</div><div class="title">Compare</div><div class="body">Original vs refined SCANVI: F1, UMAP structure, confidence, zero-shot behavior.</div></div>
+      <div class="step"><div class="num">5</div><div class="title">Freeze release</div><div class="body">Save model, metadata, mapping table, figures, and final biomarker summary.</div></div>
+    </div>
+    <div class="callouts">
+      <div class="callout green">
+        <strong>Immediate deliverable:</strong> a full-data `NK_State_refined` column with provenance back to `leiden_0_4`.
+      </div>
+      <div class="callout blue">
+        <strong>Final deliverable:</strong> a retrained refined-label SCANVI reference model ready for biological discovery and query mapping.
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

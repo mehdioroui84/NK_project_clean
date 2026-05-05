@@ -1,0 +1,11 @@
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+scanpy
+scvi-tools
+scarches
+torch
+leidenalg
+igraph
