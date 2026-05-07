@@ -8,4 +8,4 @@
 #SBATCH --time=12:00:00
 
 cd /path/to/NK_project
-python scripts/train_scvi.py
+python scripts/01_train_scvi.py

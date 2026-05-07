@@ -8,4 +8,4 @@
 #SBATCH --time=12:00:00
 
 cd /path/to/NK_project
-python scripts/train_scanvi.py
+python scripts/05_train_scanvi_refined_v1.py

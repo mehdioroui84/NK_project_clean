@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NK refined annotation v1 | 45-minute talk</title>
+  <style>
+    :root {
+      --ink: #16212b;
+      --muted: #52616b;
+      --line: #d9e2e5;
+      --bg: #f6f8f9;
+      --panel: #ffffff;
+      --navy: #17324d;
+      --teal: #1b8a8f;
+      --cyan: #77c7c5;
+      --gold: #d89a2b;
+      --green: #4e9f3d;
+      --red: #b94a48;
+      --plum: #6b5b95;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+    body { scroll-snap-type: y mandatory; overflow-y: scroll; }
+    .slide {
+      min-height: 100vh;
+      width: 100%;
+      padding: 3.2vh 4vw 4.5vh;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 1.8vh;
+      background: var(--panel);
+      border-top: 8px solid var(--teal);
+      position: relative;
+      page-break-after: always;
+    }
+    .slide.dark { background: var(--navy); color: #fff; border-color: var(--cyan); }
+    .eyebrow { color: var(--teal); font-weight: 700; font-size: 0.82rem; letter-spacing: .08em; text-transform: uppercase; }
+    .dark .eyebrow { color: var(--cyan); }
+    h1, h2, h3 { margin: 0; line-height: 1.05; letter-spacing: 0; }
+    h1 { font-size: clamp(3.0rem, 6vw, 5.8rem); max-width: 1100px; }
+    h2 { font-size: clamp(2.0rem, 3.2vw, 3.25rem); max-width: 1160px; }
+    h3 { font-size: clamp(1.2rem, 1.7vw, 1.7rem); color: var(--navy); }
+    .dark h3 { color: #e6f2f3; }
+    p { margin: 0; font-size: clamp(1.0rem, 1.25vw, 1.32rem); line-height: 1.42; color: var(--muted); }
+    .dark p { color: #d8e9ec; }
+    .claim { font-size: clamp(1.35rem, 2.1vw, 2.1rem); line-height: 1.23; font-weight: 700; color: var(--navy); max-width: 1120px; }
+    .dark .claim { color: #fff; }
+    .footer { position: absolute; left: 4vw; right: 4vw; bottom: 1.4vh; display: flex; justify-content: space-between; color: #81909a; font-size: .76rem; }
+    .dark .footer { color: #b8d1d6; }
+    .grid { display: grid; gap: 1.4rem; }
+    .grid.two { grid-template-columns: 1fr 1fr; }
+    .grid.thirds { grid-template-columns: repeat(3, 1fr); }
+    .grid.sidebar { grid-template-columns: minmax(0, 1.55fr) minmax(360px, .85fr); align-items: start; }
+    .grid.narrow-left { grid-template-columns: minmax(320px, .75fr) minmax(0, 1.45fr); align-items: start; }
+    .card { border: 1px solid var(--line); background: #fbfcfc; border-radius: 8px; padding: 1rem; }
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-top: 1.2rem; }
+    .stat { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); padding: 1rem; border-radius: 8px; }
+    .stat strong { display: block; font-size: clamp(1.6rem, 2.8vw, 2.6rem); color: var(--cyan); }
+    .stat span { color: #d7e7ea; font-size: .95rem; }
+    table { border-collapse: collapse; width: 100%; font-size: clamp(.82rem, 1vw, 1.02rem); background: #fff; }
+    th { background: var(--navy); color: #fff; text-align: left; font-weight: 700; }
+    th, td { border: 1px solid var(--line); padding: .48rem .6rem; vertical-align: top; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr:nth-child(even) td { background: #f9fbfb; }
+    .small table { font-size: .82rem; }
+    .figure { width: 100%; height: auto; max-height: 73vh; object-fit: contain; display: block; margin: 0 auto; border: 1px solid var(--line); background: #fff; }
+    .figure.full { max-height: 80vh; border: 0; }
+    .figure.tall { max-height: 76vh; }
+    .figure.medium { max-height: 63vh; }
+    .note { font-size: .94rem; color: var(--muted); line-height: 1.35; }
+    .source { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; color: #697883; }
+    .pill { display: inline-block; padding: .22rem .55rem; border-radius: 999px; background: #e9f4f4; color: var(--teal); font-size: .78rem; font-weight: 700; margin-right: .35rem; }
+    .callout { border-left: 5px solid var(--teal); padding: .85rem 1rem; background: #f4f8f8; font-size: 1.05rem; line-height: 1.35; }
+    ul { margin: .4rem 0 0 1.2rem; padding: 0; }
+    li { margin: .46rem 0; font-size: clamp(.96rem, 1.15vw, 1.18rem); line-height: 1.35; color: var(--ink); }
+    .dark li { color: #e9f3f5; }
+    .equation-list { display: grid; gap: .8rem; }
+    .eq-card { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: .85rem 1rem; }
+    .eq-card h3 { font-size: 1.05rem; margin-bottom: .35rem; color: var(--teal); }
+    math { font-family: math; font-size: clamp(1.15rem, 1.45vw, 1.48rem); }
+    .mathline { overflow-x: auto; padding: .2rem 0; }
+    .kbd { position: fixed; right: 1rem; bottom: .7rem; z-index: 99; color: #8da0a8; font-size: .72rem; }
+    @media print {
+      body { background: #fff; scroll-snap-type: none; }
+      .slide { height: 100vh; min-height: 0; break-after: page; }
+      .kbd { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="kbd">Use ↑/↓ or PgUp/PgDn</div>
+
+  <section class="slide dark">
+    <div class="eyebrow">NK project | refined annotation v1</div>
+    <h1>NK cell reference refinement</h1>
+    <p class="claim">Full-data SCVI clustering, marker-guided reannotation, refined SCANVI training, and held-out evaluation.</p>
+    <div class="stat-row">
+      <div class="stat"><strong>326k</strong><span>cells in full reference</span></div>
+      <div class="stat"><strong>0.2–0.4</strong><span>Leiden resolutions reviewed</span></div>
+      <div class="stat"><strong>25 → 15</strong><span>cluster scaffold to labels</span></div>
+      <div class="stat"><strong>0.876</strong><span>zero-shot weighted F1</span></div>
+    </div>
+    <div class="footer"><span>Regenerated HPC outputs, May 2026</span><span>01</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Storyline</div>
+    <h2>One clean reference, not a long list of cluster names</h2>
+    <div class="grid two">
+      <div class="card">
+        <h3>Problem</h3>
+        <p>Original labels and high-resolution clusters were useful for discovery, but too fragmented for a stable classifier target.</p>
+      </div>
+      <div class="card">
+        <h3>Approach</h3>
+        <p>Use full-data latent structure and marker evidence to collapse 25 Leiden 0.4 clusters into 15 refined-v1 labels.</p>
+      </div>
+      <div class="card">
+        <h3>Evaluation</h3>
+        <p>Retrain SCANVI on refined labels and evaluate validation, full-data, zero-shot, and surgery transfer settings.</p>
+      </div>
+      <div class="card">
+        <h3>Decision rule</h3>
+        <p>Keep a label only when it is biologically interpretable and learnable; otherwise collapse into a defensible broader state.</p>
+      </div>
+    </div>
+    <div class="footer"><span>NK refined annotation v1</span><span>02</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Pipeline</div>
+    <h2>The analysis sequence is deliberately linear</h2>
+    <div class="grid two">
+      <div>
+        <table>
+          <tr><th>Step</th><th>Purpose</th></tr>
+          <tr><td>01 SCVI</td><td>Learn a full-data latent representation.</td></tr>
+          <tr><td>08 batch comparison</td><td>Choose the production batch key.</td></tr>
+          <tr><td>02 Leiden discovery</td><td>Compare resolutions 0.2, 0.3, and 0.4.</td></tr>
+          <tr><td>03 markers</td><td>Use DE and curated markers to interpret clusters.</td></tr>
+          <tr><td>04 refined labels</td><td>Map Leiden 0.4 clusters to refined-v1 labels.</td></tr>
+          <tr><td>05–07 SCANVI</td><td>Train, evaluate, and compare surgery vs zero-shot.</td></tr>
+        </table>
+      </div>
+      <div class="callout">For the talk, the story starts with why <strong>assay_clean</strong> was used, then moves to why <strong>Leiden 0.4</strong> was selected, and only then discusses the refined-v1 classifier.</div>
+    </div>
+    <div class="footer"><span>NK refined annotation v1</span><span>03</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Metric definitions | batch key comparison</div>
+    <h2>Silhouette-based metrics used in the batch-key comparison</h2>
+    <div class="equation-list">
+      <div class="eq-card">
+        <h3>Per-cell silhouette</h3>
+        <div class="mathline"><math display="block"><msub><mi>s</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>b</mi><mi>i</mi></msub><mo>−</mo><msub><mi>a</mi><mi>i</mi></msub></mrow><mrow><mi>max</mi><mo stretchy="false">(</mo><msub><mi>a</mi><mi>i</mi></msub><mo>,</mo><msub><mi>b</mi><mi>i</mi></msub><mo stretchy="false">)</mo></mrow></mfrac></math></div>
+        <p class="note"><em>a</em><sub>i</sub> is mean distance to the same label; <em>b</em><sub>i</sub> is mean distance to the nearest other label.</p>
+      </div>
+      <div class="eq-card">
+        <h3>NK-state ASW / biology preservation</h3>
+        <div class="mathline"><math display="block"><msub><mi>ASW</mi><mi>NK</mi></msub><mo>=</mo><mfrac><mrow><mn>1</mn><mo>+</mo><mfrac><mn>1</mn><mi>N</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>NK_State</mi><mo stretchy="false">)</mo></mrow><mn>2</mn></mfrac></math></div>
+        <p class="note">This matches the implementation: `silhouette_score(..., labels=NK_State)` rescaled from [-1, 1] to [0, 1]. Higher means stronger preservation of NK-state structure.</p>
+      </div>
+      <div class="eq-card">
+        <h3>Dataset/assay ASW mixing, label-aware</h3>
+        <div class="mathline"><math display="block"><msub><mi>M</mi><mrow><mi>ASW</mi><mo>,</mo><mi>B</mi><mo>|</mo><mi>Y</mi></mrow></msub><mo>=</mo><mfrac><mrow><munderover><mo>∑</mo><mi>y</mi><mi>Y</mi></munderover><msub><mi>n</mi><mi>y</mi></msub><mo>[</mo><mn>1</mn><mo>−</mo><mo>|</mo><mfrac><mn>1</mn><msub><mi>n</mi><mi>y</mi></msub></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mi>y</mi></mrow></munderover><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>B</mi><mo stretchy="false">)</mo><mo>|</mo><mo>]</mo></mrow><mrow><munderover><mo>∑</mo><mi>y</mi><mi>Y</mi></munderover><msub><mi>n</mi><mi>y</mi></msub></mrow></mfrac></math></div>
+        <p class="note"><em>B</em> is either dataset_id or assay_clean. Silhouette is computed within each NK-state label, then transformed as 1 − |mean silhouette|. Higher means better batch mixing within biology.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Equations from nk_project/metrics.py</span><span>04</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Metric definitions | kNN and graph metrics</div>
+    <h2>kNN and graph metrics used in the batch-key comparison</h2>
+    <div class="equation-list">
+      <div class="eq-card">
+        <h3>kNN label accuracy</h3>
+        <div class="mathline"><math display="block"><msub><mi>Acc</mi><mrow><mi>kNN</mi><mo>,</mo><mi>Y</mi></mrow></msub><mo>=</mo><mfrac><mn>1</mn><mi>N</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover><mi>𝟙</mi><mo>[</mo><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><mi>mode</mi><mo stretchy="false">(</mo><mo>{</mo><msub><mi>y</mi><mi>j</mi></msub><mo>:</mo><mi>j</mi><mo>∈</mo><msub><mi>N</mi><mi>k</mi></msub><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo><mo>}</mo><mo stretchy="false">)</mo><mo>]</mo></math></div>
+        <p class="note">Higher means local neighborhoods preserve NK-state labels.</p>
+      </div>
+      <div class="eq-card">
+        <h3>Within-label kNN batch predictability</h3>
+        <div class="mathline"><math display="block"><msub><mi>Acc</mi><mrow><mi>kNN</mi><mo>,</mo><mi>B</mi><mo>|</mo><mi>Y</mi></mrow></msub><mo>=</mo><mfrac><mrow><munderover><mo>∑</mo><mi>y</mi><mi>Y</mi></munderover><msub><mi>n</mi><mi>y</mi></msub><msub><mi>Acc</mi><mrow><mi>kNN</mi><mo>,</mo><mi>B</mi></mrow></msub><mo stretchy="false">(</mo><mi>Y</mi><mo>=</mo><mi>y</mi><mo stretchy="false">)</mo></mrow><mrow><munderover><mo>∑</mo><mi>y</mi><mi>Y</mi></munderover><msub><mi>n</mi><mi>y</mi></msub></mrow></mfrac></math></div>
+        <p class="note">Lower raw batch predictability is better. The reported mixing score below rescales this so higher is better.</p>
+      </div>
+      <div class="eq-card">
+        <h3>Normalized kNN batch mixing score</h3>
+        <div class="mathline"><math display="block"><msub><mi>M</mi><mrow><mi>kNN</mi><mo>,</mo><mi>B</mi></mrow></msub><mo>=</mo><mn>1</mn><mo>−</mo><mfrac><mrow><mi>max</mi><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><msub><mi>Acc</mi><mrow><mi>kNN</mi><mo>,</mo><mi>B</mi><mo>|</mo><mi>Y</mi></mrow></msub><mo>−</mo><msub><mi>Base</mi><mi>B</mi></msub><mo stretchy="false">)</mo></mrow><mrow><mn>1</mn><mo>−</mo><msub><mi>Base</mi><mi>B</mi></msub></mrow></mfrac></math></div>
+        <p class="note">`Base` is the within-label majority-batch baseline. The final score is clipped to [0, 1]. Higher means batch is not more predictable than baseline.</p>
+      </div>
+      <div class="eq-card">
+        <h3>Graph connectivity</h3>
+        <div class="mathline"><math display="block"><mi>GC</mi><mo>=</mo><mfrac><mn>1</mn><mrow><mo>|</mo><mi>Y</mi><mo>|</mo></mrow></mfrac><munderover><mo>∑</mo><mi>y</mi><mi>Y</mi></munderover><mfrac><mrow><mi>max</mi><mo stretchy="false">(</mo><mi>connected component size in class</mi><mo> </mo><mi>y</mi><mo stretchy="false">)</mo></mrow><msub><mi>n</mi><mi>y</mi></msub></mfrac></math></div>
+        <p class="note">Higher means cells from the same NK-state label remain connected in the latent kNN graph.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Equations from nk_project/metrics.py and 08_compare_batch_strategies.py</span><span>05</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Batch key comparison</div>
+    <h2>assay_clean preserved biology while maintaining strong mixing</h2>
+    <img class="figure full" src="../outputs/batch_strategy_reevaluation/batch_strategy_absolute_scores.png" alt="Batch strategy absolute scores">
+    <p class="source">Figure: outputs/batch_strategy_reevaluation/batch_strategy_absolute_scores.png</p>
+    <div class="footer"><span>Batch strategy comparison</span><span>06</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Batch key comparison</div>
+    <h2>Numerical summary for the batch-key decision</h2>
+    <table>
+      <tr><th>strategy</th><th>batch key</th><th class="num">val macro F1</th><th class="num">zero-shot macro F1</th><th class="num">full macro F1</th><th class="num">NK-state ASW</th><th class="num">graph connectivity</th><th class="num">kNN label acc.</th><th class="num">dataset ASW mix</th><th class="num">assay ASW mix</th></tr>
+      <tr><td>assay_only</td><td>assay_clean</td><td class="num">0.921</td><td class="num">0.483</td><td class="num">0.882</td><td class="num">0.558</td><td class="num">0.995</td><td class="num">0.943</td><td class="num">0.937</td><td class="num">0.934</td></tr>
+      <tr><td>dataset_only</td><td>dataset_id</td><td class="num">0.919</td><td class="num">0.475</td><td class="num">0.877</td><td class="num">0.510</td><td class="num">0.991</td><td class="num">0.933</td><td class="num">0.897</td><td class="num">0.921</td></tr>
+      <tr><td>composite_only</td><td>batch_composite</td><td class="num">0.916</td><td class="num">0.475</td><td class="num">0.883</td><td class="num">0.503</td><td class="num">0.991</td><td class="num">0.928</td><td class="num">0.903</td><td class="num">0.924</td></tr>
+    </table>
+    <div class="callout">Decision: use <strong>assay_clean</strong>. It had the strongest biology-preservation metrics and high graph connectivity, while avoiding study-ID-specific adaptation.</div>
+    <p class="source">Table values from regenerated HPC run summary pasted after rerun; metric definitions shown on slides 4–5.</p>
+    <div class="footer"><span>Batch strategy comparison</span><span>07</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Leiden discovery</div>
+    <h2>Resolution sweep used the full-data SCVI latent space</h2>
+    <img class="figure full" src="../outputs/leiden_discovery/figures/full_leiden_resolution_overview.png" alt="Leiden resolution overview">
+    <p class="source">Figure: outputs/leiden_discovery/figures/full_leiden_resolution_overview.png</p>
+    <div class="footer"><span>Leiden resolution comparison</span><span>08</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Leiden discovery</div>
+    <h2>Resolution 0.4 was selected as the annotation scaffold</h2>
+    <div class="grid narrow-left">
+      <table>
+        <tr><th>resolution</th><th class="num">clusters</th><th class="num">min cluster</th><th class="num">max cluster</th></tr>
+        <tr><td>0.2</td><td class="num">16</td><td class="num">831</td><td class="num">108,033</td></tr>
+        <tr><td>0.3</td><td class="num">21</td><td class="num">273</td><td class="num">101,069</td></tr>
+        <tr><td><strong>0.4</strong></td><td class="num"><strong>25</strong></td><td class="num"><strong>929</strong></td><td class="num"><strong>49,483</strong></td></tr>
+      </table>
+      <div>
+        <img class="figure medium" src="../outputs/leiden_discovery/figures/full_leiden_0_4_overview.png" alt="Leiden 0.4 overview">
+        <p class="source">Figure: outputs/leiden_discovery/figures/full_leiden_0_4_overview.png</p>
+      </div>
+    </div>
+    <div class="callout">Rationale: 0.2 was too coarse; 0.3 helped; 0.4 separated useful biological and non-NK teaching regions while remaining small enough to collapse manually.</div>
+    <div class="footer"><span>Leiden 0.4 decision</span><span>09</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Marker evidence</div>
+    <h2>Top marker matrix: cluster identities were marker-supported</h2>
+    <img class="figure full" src="../outputs/markers/full/leiden_0_4/leiden_0_4_matrixplot_top_markers.png" alt="Top marker matrixplot">
+    <p class="source">Figure: outputs/markers/full/leiden_0_4/leiden_0_4_matrixplot_top_markers.png</p>
+    <div class="footer"><span>Marker analysis</span><span>10</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Marker evidence</div>
+    <h2>Curated marker matrix: second-pass biological sanity check</h2>
+    <img class="figure full" src="../outputs/markers/full/leiden_0_4/leiden_0_4_curated_marker_matrixplot.png" alt="Curated marker matrixplot">
+    <p class="source">Figure: outputs/markers/full/leiden_0_4/leiden_0_4_curated_marker_matrixplot.png</p>
+    <div class="footer"><span>Marker analysis</span><span>11</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Refined labels</div>
+    <h2>25 Leiden 0.4 clusters were collapsed to 15 refined labels</h2>
+    <div class="grid two small">
+      <table>
+        <tr><th>refined label</th><th class="num">cells</th></tr>
+        <tr><td>Mature Cytotoxic</td><td class="num">105,989</td></tr>
+        <tr><td>Lung Cytotoxic NK</td><td class="num">52,028</td></tr>
+        <tr><td>T</td><td class="num">39,815</td></tr>
+        <tr><td>Transitional Cytotoxic Tissue-Resident</td><td class="num">29,049</td></tr>
+        <tr><td>Transitional Cytotoxic</td><td class="num">24,357</td></tr>
+        <tr><td>B</td><td class="num">17,821</td></tr>
+        <tr><td>Cytokine-Stimulated Proliferative</td><td class="num">15,756</td></tr>
+        <tr><td>Cytokine-Stimulated CCR7+</td><td class="num">10,058</td></tr>
+      </table>
+      <table>
+        <tr><th>refined label</th><th class="num">cells</th></tr>
+        <tr><td>Proliferative</td><td class="num">8,720</td></tr>
+        <tr><td>Unknown_BM_1 Erythroid-like</td><td class="num">8,193</td></tr>
+        <tr><td>Regulatory</td><td class="num">5,730</td></tr>
+        <tr><td>Mature Cytotoxic TCF7+</td><td class="num">5,263</td></tr>
+        <tr><td>Unknown_Kidney</td><td class="num">1,361</td></tr>
+        <tr><td>Lung GZMK+ XCL1+ NK</td><td class="num">1,124</td></tr>
+        <tr><td>Myeloid-like</td><td class="num">929</td></tr>
+      </table>
+    </div>
+    <p class="note">B and T were intentionally kept broad because they teach the model what non-NK cells look like; they are not the biological focus of the NK state naming.</p>
+    <div class="footer"><span>Refined annotation v1</span><span>12</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Refined labels</div>
+    <h2>Refined labels are coherent in the full SCVI latent space</h2>
+    <img class="figure full" src="../outputs/refined_annotation_v1/figures/full_refined_v1_umap.png" alt="Refined v1 UMAP">
+    <p class="source">Figure: outputs/refined_annotation_v1/figures/full_refined_v1_umap.png</p>
+    <div class="footer"><span>Refined annotation v1</span><span>13</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Metric definitions | classifier evaluation</div>
+    <h2>SCANVI classifier metrics</h2>
+    <div class="grid two">
+      <div class="equation-list">
+        <div class="eq-card"><h3>Precision and recall</h3><div class="mathline"><math display="block"><msub><mi>Precision</mi><mi>c</mi></msub><mo>=</mo><mfrac><msub><mi>TP</mi><mi>c</mi></msub><mrow><msub><mi>TP</mi><mi>c</mi></msub><mo>+</mo><msub><mi>FP</mi><mi>c</mi></msub></mrow></mfrac><mo>,</mo><mspace width="1em"/><msub><mi>Recall</mi><mi>c</mi></msub><mo>=</mo><mfrac><msub><mi>TP</mi><mi>c</mi></msub><mrow><msub><mi>TP</mi><mi>c</mi></msub><mo>+</mo><msub><mi>FN</mi><mi>c</mi></msub></mrow></mfrac></math></div></div>
+        <div class="eq-card"><h3>Class F1</h3><div class="mathline"><math display="block"><msub><mi>F1</mi><mi>c</mi></msub><mo>=</mo><mfrac><mrow><mn>2</mn><mo>·</mo><msub><mi>Precision</mi><mi>c</mi></msub><mo>·</mo><msub><mi>Recall</mi><mi>c</mi></msub></mrow><mrow><msub><mi>Precision</mi><mi>c</mi></msub><mo>+</mo><msub><mi>Recall</mi><mi>c</mi></msub></mrow></mfrac></math></div></div>
+      </div>
+      <div class="equation-list">
+        <div class="eq-card"><h3>Macro F1</h3><div class="mathline"><math display="block"><mi>Macro</mi><mo>−</mo><mi>F1</mi><mo>=</mo><mfrac><mn>1</mn><mi>C</mi></mfrac><munderover><mo>∑</mo><mrow><mi>c</mi><mo>=</mo><mn>1</mn></mrow><mi>C</mi></munderover><msub><mi>F1</mi><mi>c</mi></msub></math></div><p class="note">Each class contributes equally.</p></div>
+        <div class="eq-card"><h3>Weighted F1</h3><div class="mathline"><math display="block"><mi>Weighted</mi><mo>−</mo><mi>F1</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>c</mi><mo>=</mo><mn>1</mn></mrow><mi>C</mi></munderover><mfrac><msub><mi>n</mi><mi>c</mi></msub><mi>N</mi></mfrac><msub><mi>F1</mi><mi>c</mi></msub></math></div><p class="note">Large classes contribute more.</p></div>
+      </div>
+    </div>
+    <div class="footer"><span>Classifier metric definitions</span><span>14</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Refined SCANVI</div>
+    <h2>Refined-v1 SCANVI performance summary</h2>
+    <table>
+      <tr><th>split</th><th class="num">macro F1</th><th class="num">weighted F1</th><th>interpretation</th></tr>
+      <tr><td>validation</td><td class="num">0.9687</td><td class="num">0.9693</td><td>Held-in validation performance is high.</td></tr>
+      <tr><td>zero-shot</td><td class="num">0.7588</td><td class="num">0.8758</td><td>Held-out performance is useful but dataset-dependent.</td></tr>
+      <tr><td>full</td><td class="num">0.9809</td><td class="num">0.9808</td><td>Full evaluated data fit is strong.</td></tr>
+    </table>
+    <div class="callout">The gap between validation/full and zero-shot indicates that the main remaining challenge is transfer across held-out datasets, not learning the refined-v1 labels.</div>
+    <p class="source">Table values from regenerated HPC run summary pasted after rerun.</p>
+    <div class="footer"><span>Refined SCANVI evaluation</span><span>15</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Refined SCANVI</div>
+    <h2>Full-data SCANVI panels</h2>
+    <img class="figure full" src="../outputs/refined_scanvi_v1/figures/scanvi_full_umap_panels.png" alt="SCANVI full UMAP panels">
+    <p class="source">Figure: outputs/refined_scanvi_v1/figures/scanvi_full_umap_panels.png</p>
+    <div class="footer"><span>Refined SCANVI evaluation</span><span>16</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Zero-shot evaluation</div>
+    <h2>Held-out zero-shot performance varies by dataset</h2>
+    <img class="figure full" src="../outputs/refined_scanvi_v1/figures/scanvi_zeroshot_by_dataset_summary.png" alt="Zero-shot dataset summary">
+    <p class="source">Figure: outputs/refined_scanvi_v1/figures/scanvi_zeroshot_by_dataset_summary.png</p>
+    <div class="footer"><span>Held-out evaluation</span><span>17</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Zero-shot evaluation</div>
+    <h2>Zero-shot UMAP panels show where transfer succeeds or fails</h2>
+    <img class="figure full" src="../outputs/refined_scanvi_v1/figures/scanvi_zeroshot_umap_panels.png" alt="Zero-shot UMAP panels">
+    <p class="source">Figure: outputs/refined_scanvi_v1/figures/scanvi_zeroshot_umap_panels.png</p>
+    <div class="footer"><span>Held-out evaluation</span><span>18</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Zero-shot evaluation</div>
+    <h2>Error maps localize unstable interfaces</h2>
+    <div class="grid two">
+      <div><img class="figure tall" src="../outputs/refined_scanvi_v1/figures/scanvi_zeroshot_local_error_rate.png" alt="Zero-shot local error rate"><p class="source">scanvi_zeroshot_local_error_rate.png</p></div>
+      <div><img class="figure tall" src="../outputs/refined_scanvi_v1/figures/scanvi_zeroshot_correct_incorrect.png" alt="Zero-shot correct incorrect"><p class="source">scanvi_zeroshot_correct_incorrect.png</p></div>
+    </div>
+    <div class="footer"><span>Held-out evaluation</span><span>19</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Surgery comparison</div>
+    <h2>Surgery was evaluated only where a new assay adapter existed</h2>
+    <table>
+      <tr><th>assay status in held-out data</th><th>assay_clean categories</th></tr>
+      <tr><td>Already present in training</td><td>10x 3' v1, 10x 3' v2, 10x 3' v3, 10x 5' transcription profiling, 10x 5' v1, Seq-Well</td></tr>
+      <tr><td>Absent during training</td><td><strong>ScaleBio single cell RNA sequencing</strong></td></tr>
+      <tr><td>Surgery query subset</td><td>4,932 held-out ScaleBio cells</td></tr>
+      <tr><td>Evaluated labels</td><td>Mature Cytotoxic and Lung GZMK+ XCL1+ NK; rare CCR7+ class dropped for this subset</td></tr>
+    </table>
+    <div class="callout">Because the reference model used <strong>assay_clean</strong> as the adapter key, surgery is only conceptually meaningful for a held-out assay category that was not seen in reference training.</div>
+    <div class="footer"><span>Model surgery</span><span>20</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Surgery comparison</div>
+    <h2>For ScaleBio, surgery did not improve over zero-shot</h2>
+    <div class="grid two">
+      <div><img class="figure medium" src="../outputs/refined_scanvi_v1_surgery_new_assays_only_e10_lr1e4/figures/scanvi_surgery_vs_zeroshot_summary.png" alt="Surgery summary"><p class="source">scanvi_surgery_vs_zeroshot_summary.png</p></div>
+      <div><img class="figure medium" src="../outputs/refined_scanvi_v1_surgery_new_assays_only_e10_lr1e4/figures/scanvi_surgery_vs_zeroshot_per_class_f1.png" alt="Surgery per class"><p class="source">scanvi_surgery_vs_zeroshot_per_class_f1.png</p></div>
+    </div>
+    <table>
+      <tr><th>method</th><th class="num">macro F1</th><th class="num">weighted F1</th></tr>
+      <tr><td>zero-shot same query</td><td class="num">0.7739</td><td class="num">0.8781</td></tr>
+      <tr><td>surgery</td><td class="num">0.7594</td><td class="num">0.8543</td></tr>
+    </table>
+    <div class="footer"><span>Model surgery</span><span>21</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Conclusions</div>
+    <h2>Main conclusions for the refined-v1 reference</h2>
+    <ul>
+      <li><strong>assay_clean</strong> is the production batch key because it preserves NK-state biology while maintaining strong graph connectivity.</li>
+      <li><strong>Leiden 0.4</strong> is a good scaffold, but not the final biological label set.</li>
+      <li><strong>25 clusters collapse to 15 labels</strong>, with B and T retained as broad non-NK teaching classes.</li>
+      <li><strong>Refined SCANVI is strong on validation/full data</strong> and gives useful zero-shot transfer.</li>
+      <li><strong>Surgery should not be claimed as an improvement</strong> in the current ScaleBio test.</li>
+    </ul>
+    <div class="footer"><span>Takeaways</span><span>22</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="eyebrow">Files used</div>
+    <h2>Primary outputs shown in this HTML deck</h2>
+    <p class="source">outputs/batch_strategy_reevaluation/batch_strategy_absolute_scores.png</p>
+    <p class="source">outputs/leiden_discovery/figures/full_leiden_resolution_overview.png</p>
+    <p class="source">outputs/leiden_discovery/figures/full_leiden_0_4_overview.png</p>
+    <p class="source">outputs/markers/full/leiden_0_4/leiden_0_4_matrixplot_top_markers.png</p>
+    <p class="source">outputs/markers/full/leiden_0_4/leiden_0_4_curated_marker_matrixplot.png</p>
+    <p class="source">outputs/refined_annotation_v1/figures/full_refined_v1_umap.png</p>
+    <p class="source">outputs/refined_scanvi_v1/figures/*.png</p>
+    <p class="source">outputs/refined_scanvi_v1_surgery_new_assays_only_e10_lr1e4/figures/*.png</p>
+    <p class="source">nk_project/metrics.py and scripts/08_compare_batch_strategies.py for metric equations</p>
+    <div class="footer"><span>Provenance</span><span>23</span></div>
+  </section>
+
+  <section class="slide dark">
+    <div class="eyebrow">Discussion</div>
+    <h1>Discussion</h1>
+    <p class="claim">Where should refined-v1 be reviewed most carefully before release?</p>
+    <ul>
+      <li>Lung held-out transfer errors</li>
+      <li>Rare labels and non-NK-like teaching classes</li>
+      <li>Final written label definitions with marker support</li>
+    </ul>
+    <div class="footer"><span>NK refined annotation v1</span><span>24</span></div>
+  </section>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const y = window.scrollY + window.innerHeight / 2;
+      let idx = slides.findIndex(s => s.offsetTop <= y && s.offsetTop + s.offsetHeight > y);
+      if (idx < 0) idx = 0;
+      if (['ArrowDown','PageDown',' '].includes(e.key)) {
+        e.preventDefault();
+        slides[Math.min(slides.length - 1, idx + 1)].scrollIntoView({ behavior: 'smooth' });
+      }
+      if (['ArrowUp','PageUp'].includes(e.key)) {
+        e.preventDefault();
+        slides[Math.max(0, idx - 1)].scrollIntoView({ behavior: 'smooth' });
+      }
+      if (e.key === 'Home') slides[0].scrollIntoView({ behavior: 'smooth' });
+      if (e.key === 'End') slides[slides.length - 1].scrollIntoView({ behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>

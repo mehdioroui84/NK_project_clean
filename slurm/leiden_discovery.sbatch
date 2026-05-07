@@ -7,4 +7,4 @@
 #SBATCH --time=06:00:00
 
 cd /path/to/NK_project
-python scripts/run_leiden_discovery.py
+python scripts/02_run_leiden_discovery.py

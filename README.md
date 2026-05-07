@@ -28,11 +28,14 @@ NK_project/
     workflows.py
     io_utils.py
   scripts/
-    profile_batches.py
-    train_scvi.py
-    train_scanvi.py
-    run_leiden_discovery.py
-    run_batch_key_comparison.py
+    01_train_scvi.py
+    02_run_leiden_discovery.py
+    03_run_marker_analysis.py
+    04_apply_refined_v1_labels.py
+    05_train_scanvi_refined_v1.py
+    06_evaluate_scanvi_refined_v1.py
+    07_run_scanvi_surgery.py
+    08_compare_batch_strategies.py
   logs/
     .gitkeep
   experiments/
@@ -56,30 +59,30 @@ From the project folder:
 ```bash
 mkdir -p logs
 
-python scripts/profile_batches.py 2>&1 | tee logs/profile_batches.log
-python scripts/train_scvi.py 2>&1 | tee logs/scvi_train.log
-python scripts/train_scanvi.py 2>&1 | tee logs/scanvi_train.log
-python scripts/plot_scanvi_results.py 2>&1 | tee logs/scanvi_plot.log
-python scripts/plot_latent_metrics.py 2>&1 | tee logs/latent_metrics.log
-python scripts/run_leiden_validation.py 2>&1 | tee logs/leiden_validation.log
-python scripts/run_leiden_discovery.py 2>&1 | tee logs/leiden_discovery.log
+python scripts/01_train_scvi.py 2>&1 | tee logs/01_train_scvi.log
+python scripts/02_run_leiden_discovery.py 2>&1 | tee logs/02_run_leiden_discovery.log
+python scripts/03_run_marker_analysis.py 2>&1 | tee logs/03_run_marker_analysis.log
+python scripts/04_apply_refined_v1_labels.py 2>&1 | tee logs/04_apply_refined_v1_labels.log
+python scripts/05_train_scanvi_refined_v1.py 2>&1 | tee logs/05_train_scanvi_refined_v1.log
+python scripts/06_evaluate_scanvi_refined_v1.py 2>&1 | tee logs/06_evaluate_scanvi_refined_v1.log
 ```
 
-Optional historical comparison:
+Optional comparisons:
 
 ```bash
-python scripts/run_batch_key_comparison.py 2>&1 | tee logs/batch_key_comparison.log
+python scripts/07_run_scanvi_surgery.py --new-assays-only 2>&1 | tee logs/07_run_scanvi_surgery.log
+python scripts/08_compare_batch_strategies.py 2>&1 | tee logs/08_compare_batch_strategies.log
 ```
 
 ## Main Workflow
 
 1. Train final SCVI with `batch_key = assay_clean`.
-2. Save SCVI model, latent embeddings, metadata, UMAP, and clustering inputs.
-3. Run Leiden clustering on SCVI latent space over multiple resolutions.
-4. Inspect cluster biology, assay balance, dataset balance, and markers.
-5. Create a refined label column only after biological validation.
-6. Train SCANVI with original `NK_State` as the baseline classifier.
-7. Later train SCANVI with a refined label column such as `NK_State_refined`.
+2. Run full-data Leiden clustering at resolutions `0.2`, `0.3`, and `0.4`.
+3. Inspect cluster biology and marker evidence, then use `leiden_0_4`.
+4. Apply the refined-v1 labels from the `leiden_0_4` cluster map.
+5. Train SCANVI with `NK_State_refined`.
+6. Evaluate full-data, held-out zero-shot, and by-dataset performance.
+7. Optionally compare SCANVI surgery and batch-key strategies.
 
 See `PROJECT_PLAN.md` for the living analysis plan and progress checklist.
 
