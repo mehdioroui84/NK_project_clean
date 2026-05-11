@@ -36,6 +36,7 @@ NK_project/
     06_evaluate_scanvi_refined_v1.py
     07_run_scanvi_surgery.py
     08_compare_batch_strategies.py
+    09_gene_attribution.py
   logs/
     .gitkeep
   experiments/
@@ -65,6 +66,7 @@ python scripts/03_run_marker_analysis.py 2>&1 | tee logs/03_run_marker_analysis.
 python scripts/04_apply_refined_v1_labels.py 2>&1 | tee logs/04_apply_refined_v1_labels.log
 python scripts/05_train_scanvi_refined_v1.py 2>&1 | tee logs/05_train_scanvi_refined_v1.log
 python scripts/06_evaluate_scanvi_refined_v1.py 2>&1 | tee logs/06_evaluate_scanvi_refined_v1.log
+python scripts/09_gene_attribution.py 2>&1 | tee logs/09_gene_attribution.log
 ```
 
 Optional comparisons:
@@ -82,7 +84,8 @@ python scripts/08_compare_batch_strategies.py 2>&1 | tee logs/08_compare_batch_s
 4. Apply the refined-v1 labels from the `leiden_0_4` cluster map.
 5. Train SCANVI with `NK_State_refined`.
 6. Evaluate full-data, held-out zero-shot, and by-dataset performance.
-7. Optionally compare SCANVI surgery and batch-key strategies.
+7. Compute classifier-head gene attribution with Integrated Gradients.
+8. Optionally compare SCANVI surgery and batch-key strategies.
 
 See `PROJECT_PLAN.md` for the living analysis plan and progress checklist.
 

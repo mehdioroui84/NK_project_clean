@@ -35,7 +35,7 @@ VALIDATION_V1_BY_OLD_LABEL = {
     "Regulatory": "Regulatory",
     "Unconventional": "Unconventional",
     "Unknown_Lung_6": "Lung Cytotoxic NK",
-    "Unknown_Lung_5": "Lung GZMK+ XCL1+ NK",
+    "Unknown_Lung_5": "Lung DOCK4+ SLC8A1+ NK",
     "Unknown_Lung_4": "Unknown_Lung_4",
     "Unknown_Lung_3": "Unknown_Lung_3 review",
     "Unknown_Lung_1": "Unknown_Lung_1",

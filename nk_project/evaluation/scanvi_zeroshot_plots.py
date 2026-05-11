@@ -37,7 +37,7 @@ PREFERRED_COLORS = {
     "Proliferative": "#2ca02c",
     "Regulatory": "#98df8a",
     "Lung Cytotoxic NK": "#bcbd22",
-    "Lung GZMK+ XCL1+ NK": "#8c564b",
+    "Lung DOCK4+ SLC8A1+ NK": "#8c564b",
     "Unknown_Kidney": "#c49c94",
     "Unknown_BM_1 Erythroid-like": "#c5b0d5",
     "Myeloid-like": "#7f7f7f",

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 
@@ -50,11 +51,12 @@ REFINED_LABEL_BY_CLUSTER = {
     "21": "Unknown_BM_1 Erythroid-like",
     "22": "Myeloid-like",
     "23": "Lung Cytotoxic NK",
-    "24": "Lung GZMK+ XCL1+ NK",
+    "24": "Lung DOCK4+ SLC8A1+ NK",
 }
 
 
 def main():
+    args = parse_args()
     in_path = os.path.join(cfg.BASE_OUTDIR, "leiden_discovery", "full_scvi_leiden.h5ad")
     outdir = os.path.join(cfg.BASE_OUTDIR, OUTDIR_NAME)
     figdir = os.path.join(outdir, "figures")
@@ -67,15 +69,63 @@ def main():
     if "X_umap" not in adata.obsm:
         raise KeyError("X_umap not found in full-data SCVI Leiden AnnData.")
 
-    apply_labels(adata)
-    write_outputs(adata, outdir)
+    label_mapping = load_label_mapping(args.mapping_csv)
+    apply_labels(adata, label_mapping)
+    write_outputs(adata, outdir, label_mapping)
     plot_refined_umap(adata, figdir)
     print("[DONE] Full-data refined v1 label application complete.")
 
 
-def apply_labels(adata):
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Apply reviewed refined labels to full-data Leiden clusters. "
+            "By default uses the curated hardcoded v1 mapping; optionally accepts "
+            "a reviewed mapping CSV from the annotation agent."
+        )
+    )
+    parser.add_argument(
+        "--mapping-csv",
+        default=None,
+        help=(
+            "Optional reviewed mapping CSV. Expected columns: leiden_0_4 and either "
+            "candidate_refined_label or NK_State_refined."
+        ),
+    )
+    return parser.parse_args()
+
+
+def load_label_mapping(mapping_csv=None):
+    if mapping_csv is None:
+        print("[MAPPING] Using curated hardcoded refined-v1 mapping.")
+        return dict(REFINED_LABEL_BY_CLUSTER)
+
+    print(f"[MAPPING] Loading reviewed mapping CSV: {mapping_csv}")
+    mapping = pd.read_csv(mapping_csv, dtype=str)
+    if GROUPBY not in mapping.columns:
+        raise KeyError(f"{mapping_csv} must contain {GROUPBY!r}.")
+
+    label_col = None
+    for candidate in [cfg.REFINED_LABEL_KEY, "candidate_refined_label", "refined_label"]:
+        if candidate in mapping.columns:
+            label_col = candidate
+            break
+    if label_col is None:
+        raise KeyError(
+            f"{mapping_csv} must contain one of: {cfg.REFINED_LABEL_KEY!r}, "
+            "'candidate_refined_label', or 'refined_label'."
+        )
+
+    out = dict(zip(mapping[GROUPBY].astype(str), mapping[label_col].astype(str)))
+    missing = sorted(set(REFINED_LABEL_BY_CLUSTER) - set(out), key=cluster_sort_key)
+    if missing:
+        raise ValueError(f"Mapping CSV is missing {GROUPBY} clusters: {missing}")
+    return out
+
+
+def apply_labels(adata, label_mapping):
     clusters = adata.obs[GROUPBY].astype(str)
-    labels = clusters.map(REFINED_LABEL_BY_CLUSTER)
+    labels = clusters.map(label_mapping)
     if labels.isna().any():
         missing = sorted(clusters[labels.isna()].unique(), key=cluster_sort_key)
         raise ValueError(f"Missing refined labels for {GROUPBY} clusters: {missing}")
@@ -88,7 +138,7 @@ def apply_labels(adata):
     print(adata.obs[cfg.REFINED_LABEL_KEY].astype(str).value_counts().to_string())
 
 
-def write_outputs(adata, outdir):
+def write_outputs(adata, outdir, label_mapping):
     h5ad_path = os.path.join(outdir, "full_scvi_leiden_refined_v1.h5ad")
     obs_path = os.path.join(outdir, "full_refined_v1_obs_metadata.csv")
     mapping_path = os.path.join(outdir, "full_leiden_0_4_to_refined_v1_mapping.csv")
@@ -96,13 +146,13 @@ def write_outputs(adata, outdir):
 
     mapping = pd.DataFrame(
         {
-            GROUPBY: list(REFINED_LABEL_BY_CLUSTER.keys()),
-            cfg.REFINED_LABEL_KEY: list(REFINED_LABEL_BY_CLUSTER.values()),
+            GROUPBY: list(label_mapping.keys()),
+            cfg.REFINED_LABEL_KEY: list(label_mapping.values()),
         }
     )
     mapping[GROUPBY] = pd.Categorical(
         mapping[GROUPBY],
-        categories=sorted(REFINED_LABEL_BY_CLUSTER, key=cluster_sort_key),
+        categories=sorted(label_mapping, key=cluster_sort_key),
         ordered=True,
     )
     mapping = mapping.sort_values(GROUPBY)
@@ -265,7 +315,7 @@ def category_colors(categories):
         "Regulatory": "#98df8a",
         "Unconventional": "#9467bd",
         "Lung Cytotoxic NK": "#bcbd22",
-        "Lung GZMK+ XCL1+ NK": "#8c564b",
+        "Lung DOCK4+ SLC8A1+ NK": "#8c564b",
         "Unknown_Kidney": "#c49c94",
         "Unknown_BM_1 Erythroid-like": "#c5b0d5",
         "Myeloid-like": "#7f7f7f",
