@@ -409,13 +409,20 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
     if comparison.empty:
         return
 
+    display_labels = {
+        "zero_shot_same_query": "Zero-shot",
+        "surgery": "Surgery",
+    }
     fig, ax = plt.subplots(figsize=(5.8, 3.6))
     x = np.arange(len(comparison))
     width = 0.34
     ax.bar(x - width / 2, comparison["macro_f1"], width, label="Macro F1", color="#4c78a8")
     ax.bar(x + width / 2, comparison["weighted_f1"], width, label="Weighted F1", color="#f58518")
     ax.set_xticks(x)
-    ax.set_xticklabels(comparison["method"].str.replace("_", " "), rotation=0)
+    ax.set_xticklabels(
+        [display_labels.get(method, str(method).replace("_", " ").title()) for method in comparison["method"]],
+        rotation=0,
+    )
     ax.set_ylim(0, 1)
     ax.set_ylabel("F1")
     ax.set_title("Held-out refined-v1 prediction: zero-shot vs surgery")

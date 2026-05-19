@@ -74,6 +74,16 @@ def load_cluster_evidence(paths: EvidencePaths, *, top_n: int = 50) -> dict[str,
         )
         top_gene_records = marker_records(marker_rows)
         top_genes = [row["gene"] for row in top_gene_records]
+        top_positive_genes = [
+            row["gene"]
+            for row in top_gene_records
+            if float(row.get("logfoldchanges") or 0.0) > 0
+        ]
+        top_negative_genes = [
+            row["gene"]
+            for row in top_gene_records
+            if float(row.get("logfoldchanges") or 0.0) < 0
+        ]
 
         row = worksheet.loc[cluster_id].to_dict()
         summary = cluster_summary.loc[cluster_id].to_dict() if cluster_id in cluster_summary.index else {}
@@ -90,7 +100,10 @@ def load_cluster_evidence(paths: EvidencePaths, *, top_n: int = 50) -> dict[str,
             "composition": composition,
             "top_de_genes": top_gene_records,
             "top_gene_names": top_genes,
-            "marker_program_hits": marker_program_hits(top_genes),
+            "top_positive_gene_names": top_positive_genes,
+            "top_negative_gene_names": top_negative_genes,
+            "marker_program_hits": marker_program_hits(top_positive_genes),
+            "negative_marker_program_hits": marker_program_hits(top_negative_genes),
             "curated_marker_means": curated_values,
         }
         if paths.pairwise_dir:
@@ -169,6 +182,10 @@ def marker_records(df: pd.DataFrame) -> list[dict[str, Any]]:
         "pvals_adj",
         "pct_nz_group",
         "pct_nz_reference",
+        "pct_expr_group",
+        "pct_expr_reference",
+        "pct_expr_diff",
+        "marker_direction",
     ]
     available = [col for col in cols if col in df.columns]
     for _, row in df[available].iterrows():

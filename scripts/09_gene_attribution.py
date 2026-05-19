@@ -886,11 +886,15 @@ def plot_gene_selection_diagnostics(
             }
         )
 
-    fig.suptitle(
-        "Attribution gene-selection diagnostic: 1% of top gene, capped at 50",
-        fontsize=13,
-        fontweight="bold",
-    )
+    if args.gene_selection == "relative_to_top":
+        pct = args.relative_to_top_frac * 100
+        title = (
+            "Attribution gene-selection diagnostic: "
+            f"{pct:g}% of top gene, min {args.min_genes_per_state}, max {args.max_genes_per_state}"
+        )
+    else:
+        title = f"Attribution gene-selection diagnostic: top {args.top_n} genes per state"
+    fig.suptitle(title, fontsize=13, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     save_figure(fig, fig_dir, "gene_attribution_gene_selection_diagnostic")
 

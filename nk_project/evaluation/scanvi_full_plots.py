@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 
@@ -108,7 +109,21 @@ def clean_ax(ax):
         spine.set_visible(False)
 
 
-def main():
+def safe_name(value: str) -> str:
+    return (
+        str(value)
+        .strip()
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("'", "")
+        .replace("+", "pos")
+        .replace("-", "_")
+        .lower()
+    )
+
+
+def main(argv: list[str] | None = None):
+    args = parse_args(argv)
     ensure_dirs(cfg.FIG_OUTDIR)
 
     latent_path = os.path.join(cfg.LATENT_OUTDIR, "scanvi_latents.npz")
@@ -154,6 +169,16 @@ def main():
     confidence = pred["confidence"].astype(float).values
     certainty = pred["certainty"].astype(float).values
     correct = true == pred_label
+    if args.split != "all":
+        if "_split" not in obs.columns:
+            raise KeyError("Requested --split, but `_split` is missing from scanvi_full_obs_metadata.csv")
+        eval_mask = obs["_split"].astype(str).values == args.split
+        if not np.any(eval_mask):
+            raise ValueError(f"No cells found for --split {args.split!r}.")
+    else:
+        eval_mask = np.ones(len(obs), dtype=bool)
+    panel_label = "full-dataset" if args.split == "all" else f"{args.split} split"
+    file_suffix = "full" if args.split == "all" else safe_name(args.split)
 
     print("[UMAP] Building UMAP from SCANVI latent space...")
     ad_umap = sc.AnnData(X=np.zeros((z.shape[0], 1), dtype=np.float32))
@@ -167,11 +192,12 @@ def main():
         os.path.join(cfg.TABLE_OUTDIR, "scanvi_full_umap.csv")
     )
 
+    eval_idx = np.flatnonzero(eval_mask)
     rng = np.random.default_rng(cfg.SEED)
-    if cfg.PLOT_MAX_POINTS and xy.shape[0] > cfg.PLOT_MAX_POINTS:
-        plot_idx = np.sort(rng.choice(np.arange(xy.shape[0]), size=cfg.PLOT_MAX_POINTS, replace=False))
+    if cfg.PLOT_MAX_POINTS and len(eval_idx) > cfg.PLOT_MAX_POINTS:
+        plot_idx = np.sort(rng.choice(eval_idx, size=cfg.PLOT_MAX_POINTS, replace=False))
     else:
-        plot_idx = np.arange(xy.shape[0])
+        plot_idx = eval_idx
 
     xy_p = xy[plot_idx]
     true_p = true[plot_idx]
@@ -191,7 +217,7 @@ def main():
 
     fig, axes = plt.subplots(3, 3, figsize=(26, 18))
     fig.subplots_adjust(left=0.04, right=0.78, top=0.94, bottom=0.06, wspace=0.35, hspace=0.35)
-    fig.suptitle("SCANVI assay_clean model: full-dataset UMAP", fontsize=14)
+    fig.suptitle(f"SCANVI assay_clean model: {panel_label} UMAP", fontsize=14)
 
     scatter_by_category(axes[0, 0], xy_p, true_p, class_colors, legend=True, title="1.1 TRUE NK_State")
     scatter_by_category(axes[0, 1], xy_p, pred_p, class_colors, legend=False, title="1.2 PRED NK_State")
@@ -218,7 +244,7 @@ def main():
         rasterized=True,
     )
     clean_ax(ax)
-    err_rate = 1.0 - float(np.mean(correct))
+    err_rate = 1.0 - float(np.mean(correct[eval_mask]))
     ax.set_title(f"1.3 Correct vs Incorrect\nsame alpha/size; error={err_rate:.1%}")
     ax.legend(
         handles=[
@@ -281,11 +307,14 @@ def main():
     fig.colorbar(sc2, ax=ax, fraction=0.046, pad=0.02)
 
     ax = axes[1, 2]
-    classes = sorted(set(true))
-    rep = classification_report(true, pred_label, labels=classes, output_dict=True, zero_division=0)
+    true_eval = true[eval_mask]
+    pred_eval = pred_label[eval_mask]
+    correct_eval = correct[eval_mask]
+    classes = sorted(set(true_eval))
+    rep = classification_report(true_eval, pred_eval, labels=classes, output_dict=True, zero_division=0)
     class_metrics = pd.DataFrame(
         {
-            "accuracy": pd.DataFrame({"true": true, "correct": correct}).groupby("true")["correct"].mean(),
+            "accuracy": pd.DataFrame({"true": true_eval, "correct": correct_eval}).groupby("true")["correct"].mean(),
             "f1": pd.Series({cls: rep[cls]["f1-score"] for cls in classes}),
             "n_true": pd.Series({cls: rep[cls]["support"] for cls in classes}),
         }
@@ -298,9 +327,9 @@ def main():
     ax.set_xticks(x)
     ax.set_xticklabels(class_metrics.index, rotation=60, ha="right", fontsize=8)
     ax.set_ylim(0, 1.05)
-    ax.set_title("2.3 Per-class full-dataset Accuracy & F1")
+    ax.set_title(f"2.3 Per-class {panel_label} Accuracy & F1")
     ax.legend(frameon=False, loc="upper right", fontsize=8)
-    class_metrics.to_csv(os.path.join(cfg.TABLE_OUTDIR, "scanvi_full_per_class_accuracy_f1.csv"))
+    class_metrics.to_csv(os.path.join(cfg.TABLE_OUTDIR, f"scanvi_{file_suffix}_per_class_accuracy_f1.csv"))
 
     scatter_by_category(
         axes[2, 0],
@@ -327,8 +356,8 @@ def main():
         title="3.3 Assay clean",
     )
 
-    png = os.path.join(cfg.FIG_OUTDIR, "scanvi_full_umap_panels.png")
-    pdf = os.path.join(cfg.FIG_OUTDIR, "scanvi_full_umap_panels.pdf")
+    png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_umap_panels.png")
+    pdf = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_umap_panels.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     fig.savefig(pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
@@ -336,8 +365,8 @@ def main():
 
     fig_err, ax_err = plt.subplots(1, 1, figsize=(14, 12))
     ax_err.scatter(
-        xy[correct, 0],
-        xy[correct, 1],
+        xy[eval_mask & correct, 0],
+        xy[eval_mask & correct, 1],
         s=0.035,
         alpha=0.24,
         color="#2166ac",
@@ -345,8 +374,8 @@ def main():
         rasterized=True,
     )
     ax_err.scatter(
-        xy[~correct, 0],
-        xy[~correct, 1],
+        xy[eval_mask & ~correct, 0],
+        xy[eval_mask & ~correct, 1],
         s=0.035,
         alpha=0.24,
         color="#d62728",
@@ -354,7 +383,7 @@ def main():
         rasterized=True,
     )
     clean_ax(ax_err)
-    ax_err.set_title(f"SCANVI correct vs incorrect, full UMAP (error={err_rate:.1%})", fontsize=13)
+    ax_err.set_title(f"SCANVI correct vs incorrect, {panel_label} UMAP (error={err_rate:.1%})", fontsize=13)
     ax_err.legend(
         handles=[
             Line2D([0], [0], marker="o", linestyle="", markersize=9, markerfacecolor="#2166ac", markeredgecolor="none", label="Correct"),
@@ -364,8 +393,8 @@ def main():
         loc="upper left",
         fontsize=10,
     )
-    err_png = os.path.join(cfg.FIG_OUTDIR, "scanvi_incorrect_predictions_large.png")
-    err_pdf = os.path.join(cfg.FIG_OUTDIR, "scanvi_incorrect_predictions_large.pdf")
+    err_png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_incorrect_predictions_large.png")
+    err_pdf = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_incorrect_predictions_large.pdf")
     fig_err.savefig(err_png, dpi=450, bbox_inches="tight", facecolor="white")
     fig_err.savefig(err_pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {err_png}")
@@ -373,17 +402,17 @@ def main():
 
     fig_local, ax_local = plt.subplots(1, 1, figsize=(14, 12))
     ax_local.scatter(
-        xy[:, 0],
-        xy[:, 1],
+        xy[eval_mask, 0],
+        xy[eval_mask, 1],
         s=0.01,
         alpha=0.02,
         color="0.45",
         rasterized=True,
     )
     hb = ax_local.hexbin(
-        xy[:, 0],
-        xy[:, 1],
-        C=(~correct).astype(float),
+        xy[eval_mask, 0],
+        xy[eval_mask, 1],
+        C=(~correct[eval_mask]).astype(float),
         reduce_C_function=np.mean,
         gridsize=85,
         mincnt=20,
@@ -395,17 +424,30 @@ def main():
     )
     clean_ax(ax_local)
     ax_local.set_title(
-        f"SCANVI local error rate, full UMAP (global error={err_rate:.1%})",
+        f"SCANVI local error rate, {panel_label} UMAP (global error={err_rate:.1%})",
         fontsize=13,
     )
     cbar = fig_local.colorbar(hb, ax=ax_local, fraction=0.035, pad=0.02)
     cbar.set_label("fraction incorrect in local bin", fontsize=10)
-    local_png = os.path.join(cfg.FIG_OUTDIR, "scanvi_local_error_rate.png")
-    local_pdf = os.path.join(cfg.FIG_OUTDIR, "scanvi_local_error_rate.pdf")
+    local_png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_local_error_rate.png")
+    local_pdf = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_local_error_rate.pdf")
     fig_local.savefig(local_png, dpi=450, bbox_inches="tight", facecolor="white")
     fig_local.savefig(local_pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {local_png}")
     print(f"[SAVE] {local_pdf}")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Plot SCANVI prediction panels for all cells or one saved split."
+    )
+    parser.add_argument(
+        "--split",
+        choices=["all", "Train", "Val", "Held-out"],
+        default="all",
+        help="Cells to show/evaluate. Uses full-data UMAP coordinates, filtered to this split.",
+    )
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":

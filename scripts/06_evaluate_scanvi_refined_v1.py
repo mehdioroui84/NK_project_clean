@@ -14,7 +14,7 @@ def main() -> None:
     args = parse_args()
 
     if not args.skip_full_plots:
-        run_full_refined_plots()
+        run_full_refined_plots(args.full_plot_split)
 
     if not args.skip_zeroshot_plots:
         print("[RUN] nk_project.evaluation.scanvi_zeroshot_plots", flush=True)
@@ -50,6 +50,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-zeroshot-plots", action="store_true")
     parser.add_argument("--skip-dataset-summary", action="store_true")
     parser.add_argument(
+        "--full-plot-split",
+        choices=["all", "Train", "Val", "Held-out"],
+        default="all",
+        help="Cell split to show in the full SCANVI UMAP panel. Default: all.",
+    )
+    parser.add_argument(
         "--known-assays-only",
         action="store_true",
         help="Pass through to the held-out dataset summary.",
@@ -69,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_full_refined_plots() -> None:
+def run_full_refined_plots(split: str = "all") -> None:
     original = {
         "BASE_OUTDIR": cfg.BASE_OUTDIR,
         "FIG_OUTDIR": cfg.FIG_OUTDIR,
@@ -90,7 +96,7 @@ def run_full_refined_plots() -> None:
     try:
         from nk_project.evaluation.scanvi_full_plots import main as full_plot_main
 
-        full_plot_main()
+        full_plot_main(["--split", split])
     finally:
         for key, value in original.items():
             setattr(cfg, key, value)

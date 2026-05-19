@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NK Annotation Agent Architecture</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5d6d7d;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --line: #cfd8e3;
+      --blue: #1f6f9f;
+      --blue-soft: #e8f2f7;
+      --green: #2f7d5c;
+      --green-soft: #e7f3ed;
+      --gold: #b87920;
+      --gold-soft: #fff4df;
+      --red: #b94a58;
+      --red-soft: #fae8eb;
+      --purple: #7050b8;
+      --purple-soft: #eee9fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #dfe6ed;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    main {
+      width: min(1500px, calc(100vw - 48px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #c8d2dc;
+      box-shadow: 0 18px 50px rgba(25, 42, 58, 0.18);
+      padding: 34px 38px 38px;
+    }
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
+      margin-bottom: 26px;
+    }
+    .kicker {
+      color: var(--blue);
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 40px;
+      letter-spacing: 0;
+      line-height: 1.08;
+    }
+    .subtitle {
+      margin: 11px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.35;
+      max-width: 980px;
+    }
+    .badge {
+      background: #eef2f5;
+      border: 1px solid var(--line);
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #405163;
+      white-space: nowrap;
+    }
+    .diagram-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 22px;
+      overflow-x: auto;
+    }
+    svg {
+      width: 100%;
+      min-width: 1320px;
+      height: auto;
+      display: block;
+    }
+    .box { fill: #fff; stroke: #c7d2dd; stroke-width: 1.5; }
+    .input { fill: var(--blue-soft); stroke: #8ab7d0; }
+    .agent { fill: var(--purple-soft); stroke: #ad9bdc; }
+    .pairwise { fill: var(--gold-soft); stroke: #d8ae6a; }
+    .output { fill: var(--green-soft); stroke: #84bea3; }
+    .guard { fill: var(--red-soft); stroke: #d99aa3; }
+    .label {
+      fill: var(--ink);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .small {
+      fill: #435466;
+      font-size: 13px;
+      font-weight: 400;
+    }
+    .tiny {
+      fill: #526373;
+      font-size: 12px;
+      font-weight: 400;
+    }
+    .arrow {
+      stroke: #667789;
+      stroke-width: 2.2;
+      fill: none;
+      marker-end: url(#arrowhead);
+    }
+    .loop {
+      stroke: var(--gold);
+      stroke-width: 2.4;
+      fill: none;
+      marker-end: url(#arrowhead-gold);
+      stroke-dasharray: 7 5;
+    }
+    .rail {
+      stroke: var(--red);
+      stroke-width: 2.2;
+      fill: none;
+      marker-end: url(#arrowhead-red);
+      stroke-dasharray: 5 4;
+    }
+    .section-title {
+      fill: #6a7785;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .legend div {
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 14px;
+      color: #3d4d5d;
+    }
+    .dot {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      margin-right: 8px;
+      vertical-align: -1px;
+      border-radius: 50%;
+    }
+    .d-blue { background: var(--blue); }
+    .d-purple { background: var(--purple); }
+    .d-gold { background: var(--gold); }
+    .d-green { background: var(--green); }
+    .d-red { background: var(--red); }
+    .notes {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .note {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--blue);
+      padding: 15px 16px;
+      min-height: 120px;
+    }
+    .note:nth-child(2) { border-left-color: var(--gold); }
+    .note:nth-child(3) { border-left-color: var(--green); }
+    .note h2 {
+      margin: 0 0 7px;
+      font-size: 18px;
+    }
+    .note p {
+      margin: 0;
+      color: #415263;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    code {
+      background: #edf1f5;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    @media print {
+      body { background: #fff; }
+      main {
+        width: 100%;
+        margin: 0;
+        box-shadow: none;
+        border: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="kicker">Optional annotation refinement agent</div>
+        <h1>Architecture of the NK refined-label agent</h1>
+        <p class="subtitle">The agent is designed as a controlled, reviewable refinement layer: it gathers evidence, proposes a pipeline-safe label, performs targeted pairwise refinement when needed, and exports files that can be reviewed before script 04 applies labels.</p>
+      </div>
+      <div class="badge">Pipeline location: <strong>03b</strong> → reviewed CSV → <strong>04</strong></div>
+    </header>
+
+    <section class="diagram-wrap" aria-label="NK annotation agent architecture diagram">
+      <svg viewBox="0 0 1420 760" role="img">
+        <defs>
+          <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+            <path d="M0,0 L12,4 L0,8 Z" fill="#667789"></path>
+          </marker>
+          <marker id="arrowhead-gold" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+            <path d="M0,0 L12,4 L0,8 Z" fill="#b87920"></path>
+          </marker>
+          <marker id="arrowhead-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+            <path d="M0,0 L12,4 L0,8 Z" fill="#b94a58"></path>
+          </marker>
+        </defs>
+
+        <text x="40" y="34" class="section-title">Inputs from completed clustering / marker analysis</text>
+        <text x="395" y="34" class="section-title">Evidence builder</text>
+        <text x="650" y="34" class="section-title">LangGraph agent loop</text>
+        <text x="1000" y="34" class="section-title">Review outputs and downstream use</text>
+
+        <!-- Inputs -->
+        <rect x="40" y="64" width="260" height="88" rx="8" class="box input"></rect>
+        <text x="62" y="95" class="label">Manual composition</text>
+        <text x="62" y="120" class="small">Top original label + fraction</text>
+        <text x="62" y="140" class="tiny">e.g. Unknown_Lung_1, T, B, Mature</text>
+
+        <rect x="40" y="176" width="260" height="88" rx="8" class="box input"></rect>
+        <text x="62" y="207" class="label">Cluster-vs-rest DE</text>
+        <text x="62" y="232" class="small">Top marker genes per Leiden cluster</text>
+        <text x="62" y="252" class="tiny">scores, logFC, pct expressed</text>
+
+        <rect x="40" y="288" width="260" height="88" rx="8" class="box input"></rect>
+        <text x="62" y="319" class="label">Curated marker programs</text>
+        <text x="62" y="344" class="small">NK, T, B, myeloid, erythroid, etc.</text>
+        <text x="62" y="364" class="tiny">used as biological anchors</text>
+
+        <rect x="40" y="400" width="260" height="88" rx="8" class="box input"></rect>
+        <text x="62" y="431" class="label">Metadata context</text>
+        <text x="62" y="456" class="small">Tissue, dataset, assay, batch signal</text>
+        <text x="62" y="476" class="tiny">helps detect technical specificity</text>
+
+        <!-- Evidence builder -->
+        <rect x="385" y="168" width="230" height="224" rx="10" class="box"></rect>
+        <text x="414" y="208" class="label">Evidence summary</text>
+        <text x="414" y="238" class="small">One compact package per cluster:</text>
+        <text x="414" y="267" class="tiny">• label composition</text>
+        <text x="414" y="290" class="tiny">• top DE genes</text>
+        <text x="414" y="313" class="tiny">• marker program hits</text>
+        <text x="414" y="336" class="tiny">• tissue/dataset/assay flags</text>
+        <text x="414" y="359" class="tiny">• previous worksheet draft, if used</text>
+
+        <!-- Agent loop -->
+        <rect x="690" y="76" width="250" height="120" rx="10" class="box agent"></rect>
+        <text x="716" y="112" class="label">LLM decision node</text>
+        <text x="716" y="139" class="small">Biology-specialized prompt</text>
+        <text x="716" y="162" class="tiny">Scores confidence, ambiguity,</text>
+        <text x="716" y="181" class="tiny">technical concern, and novelty</text>
+
+        <rect x="690" y="248" width="250" height="130" rx="10" class="box agent"></rect>
+        <text x="716" y="284" class="label">Structured decision</text>
+        <text x="716" y="311" class="small">Returns JSON fields:</text>
+        <text x="716" y="336" class="tiny">candidate label, review flag,</text>
+        <text x="716" y="355" class="tiny">concerns, alternative suggestion,</text>
+        <text x="716" y="374" class="tiny">pairwise checks to run</text>
+
+        <rect x="690" y="430" width="250" height="122" rx="10" class="box pairwise"></rect>
+        <text x="716" y="466" class="label">Pairwise refinement</text>
+        <text x="716" y="493" class="small">Only for clusters needing review</text>
+        <text x="716" y="516" class="tiny">pairwise DE + distance-prioritized</text>
+        <text x="716" y="535" class="tiny">comparisons feed the next round</text>
+
+        <rect x="690" y="604" width="250" height="92" rx="10" class="box guard"></rect>
+        <text x="716" y="638" class="label">Safety rails</text>
+        <text x="716" y="665" class="small">Avoid over-calling novelty</text>
+        <text x="716" y="685" class="tiny">technical signal is review evidence</text>
+
+        <!-- Outputs -->
+        <rect x="1040" y="72" width="320" height="98" rx="10" class="box output"></rect>
+        <text x="1068" y="106" class="label">candidate_refined_label_mapping.csv</text>
+        <text x="1068" y="134" class="small">Pipeline-safe mapping: Leiden → refined label</text>
+        <text x="1068" y="154" class="tiny">used by script 04 after human review</text>
+
+        <rect x="1040" y="204" width="320" height="98" rx="10" class="box output"></rect>
+        <text x="1068" y="238" class="label">review_flags.csv</text>
+        <text x="1068" y="266" class="small">Clusters needing manual adjudication</text>
+        <text x="1068" y="286" class="tiny">review reason + confidence/ambiguity scores</text>
+
+        <rect x="1040" y="336" width="320" height="98" rx="10" class="box output"></rect>
+        <text x="1068" y="370" class="label">cluster_annotation_report.md</text>
+        <text x="1068" y="398" class="small">Readable biological rationale per cluster</text>
+        <text x="1068" y="418" class="tiny">summary, concerns, suggested checks</text>
+
+        <rect x="1040" y="468" width="320" height="98" rx="10" class="box output"></rect>
+        <text x="1068" y="502" class="label">cluster_decision_trace.jsonl</text>
+        <text x="1068" y="530" class="small">Machine-readable decision history</text>
+        <text x="1068" y="550" class="tiny">keeps the iterative process auditable</text>
+
+        <rect x="1040" y="616" width="320" height="80" rx="10" class="box"></rect>
+        <text x="1068" y="650" class="label">script 04 applies approved CSV</text>
+        <text x="1068" y="678" class="small">Then SCANVI training / attribution continue</text>
+
+        <!-- Arrows -->
+        <path d="M300,108 C330,108 350,218 385,224" class="arrow"></path>
+        <path d="M300,220 C330,220 350,254 385,260" class="arrow"></path>
+        <path d="M300,332 C330,332 350,310 385,305" class="arrow"></path>
+        <path d="M300,444 C330,444 350,365 385,350" class="arrow"></path>
+
+        <path d="M615,280 C645,280 660,136 690,136" class="arrow"></path>
+        <path d="M815,196 L815,248" class="arrow"></path>
+        <path d="M815,378 L815,430" class="arrow"></path>
+        <path d="M815,552 C815,580 815,586 815,604" class="arrow"></path>
+
+        <path d="M690,490 C620,490 622,136 690,136" class="loop"></path>
+
+        <path d="M940,136 C976,136 996,118 1040,118" class="arrow"></path>
+        <path d="M940,313 C982,313 994,255 1040,255" class="arrow"></path>
+        <path d="M940,313 C982,313 994,385 1040,385" class="arrow"></path>
+        <path d="M940,313 C982,313 994,518 1040,518" class="arrow"></path>
+        <path d="M1200,566 L1200,616" class="arrow"></path>
+
+        <path d="M940,650 C975,650 995,650 1040,650" class="rail"></path>
+
+        <!-- Guardrail labels -->
+        <rect x="970" y="606" width="52" height="24" rx="12" fill="#fae8eb" stroke="#d99aa3"></rect>
+        <text x="983" y="623" class="tiny" fill="#8c3540">human</text>
+
+        <text x="558" y="503" class="tiny" fill="#9a671a">review-needed clusters loop back</text>
+        <text x="963" y="632" class="tiny" fill="#8c3540">approved only after review</text>
+      </svg>
+      <div class="legend">
+        <div><span class="dot d-blue"></span>Input evidence</div>
+        <div><span class="dot d-purple"></span>LLM decision loop</div>
+        <div><span class="dot d-gold"></span>Pairwise refinement</div>
+        <div><span class="dot d-red"></span>Safety / review rails</div>
+        <div><span class="dot d-green"></span>Exported outputs</div>
+      </div>
+    </section>
+
+    <section class="notes">
+      <div class="note">
+        <h2>Why this structure?</h2>
+        <p>The agent is kept evidence-first and file-based, so every decision can be audited. Nothing moves into training until the reviewed mapping CSV is accepted.</p>
+      </div>
+      <div class="note">
+        <h2>How novelty is handled</h2>
+        <p>Possible new biology is recorded as an alternative suggestion, not automatically promoted to a training label. Strong novelty needs coherent markers, pairwise support, and low technical concern.</p>
+      </div>
+      <div class="note">
+        <h2>Where it connects</h2>
+        <p>The approved mapping feeds <code>scripts/04_apply_refined_v1_labels.py</code>, then the existing SCANVI training, evaluation, and attribution pipeline can run normally.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

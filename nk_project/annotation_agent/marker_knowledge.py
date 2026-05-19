@@ -112,7 +112,7 @@ KNOWN_REFINED_LABELS: list[str] = [
     "Transitional Cytotoxic Tissue-Resident",
     "Transitional Cytotoxic",
     "Cytokine-Stimulated CCR7+",
-    "Cytokine-Stimulated Proliferative",
+    "Cytokine-Stimulated Cycling",
     "Proliferative",
     "Regulatory",
     "T",
@@ -131,4 +131,3 @@ def marker_program_hits(genes: list[str]) -> dict[str, list[str]]:
         if present:
             hits[program] = present
     return hits
-

@@ -48,6 +48,21 @@ BIOLOGY_PRESERVATION_METRICS = [
     "knn_label_acc",
 ]
 
+DEFAULT_PLOT_METRICS = [
+    "dataset_asw_mixing",
+    "assay_asw_mixing",
+    "knn_label_acc",
+]
+
+PLOT_METRIC_LABELS = {
+    "dataset_asw_mixing": "dataset\nASW\nmixing",
+    "assay_asw_mixing": "assay\nASW\nmixing",
+    "dataset_knn_mixing": "dataset\nkNN\nmixing",
+    "assay_knn_mixing": "assay\nkNN\nmixing",
+    "nk_state_asw": "NK_State\nASW",
+    "knn_label_acc": "NK_State\nkNN",
+}
+
 
 def main():
     args = parse_args()
@@ -82,7 +97,7 @@ def main():
     print(f"[SAVE] {raw_path}")
 
     plot_path = os.path.join(outdir, "batch_strategy_absolute_scores.png")
-    plot_absolute_scores(summary, plot_path)
+    plot_absolute_scores(summary, plot_path, args.plot_metrics)
     print(f"[SAVE] {plot_path}")
 
 
@@ -106,6 +121,16 @@ def parse_args():
     parser.add_argument("--refiner-batch-size", type=int, default=4096)
     parser.add_argument("--lambda-dataset", type=float, default=0.05)
     parser.add_argument("--lambda-assay", type=float, default=0.05)
+    parser.add_argument(
+        "--plot-metrics",
+        nargs="+",
+        default=DEFAULT_PLOT_METRICS,
+        choices=list(PLOT_METRIC_LABELS),
+        help=(
+            "Metrics shown in the summary heatmap. All metrics are still saved "
+            "in the CSV; this only controls the figure."
+        ),
+    )
     parser.add_argument(
         "--force-retrain",
         action="store_true",
@@ -432,19 +457,16 @@ def add_normalized_scores(summary):
     return out.sort_index()
 
 
-def plot_absolute_scores(summary, path):
-    plot_cols = BATCH_MIXING_METRICS + BIOLOGY_PRESERVATION_METRICS
-    plot_df = summary[plot_cols].copy()
-    labels = [
-        "dataset\nASW\nmixing",
-        "assay\nASW\nmixing",
-        "dataset\nkNN\nmixing",
-        "assay\nkNN\nmixing",
-        "NK_State\nASW",
-        "NK_State\nkNN",
-    ]
+def plot_absolute_scores(summary, path, plot_cols):
+    missing = [col for col in plot_cols if col not in summary.columns]
+    if missing:
+        raise KeyError(f"Requested plot metrics are missing from summary: {missing}")
 
-    fig, ax = plt.subplots(figsize=(14, max(4.5, 0.55 * len(plot_df))))
+    plot_df = summary[plot_cols].copy()
+    labels = [PLOT_METRIC_LABELS[col] for col in plot_cols]
+
+    fig_width = max(7, 1.35 * len(plot_cols) + 3)
+    fig, ax = plt.subplots(figsize=(fig_width, max(3.4, 0.55 * len(plot_df) + 1.8)))
     im = ax.imshow(plot_df.values, aspect="auto", vmin=0, vmax=1, cmap="viridis")
     ax.set_xticks(np.arange(len(labels)))
     ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=9)

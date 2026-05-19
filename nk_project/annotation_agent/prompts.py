@@ -20,6 +20,12 @@ Biology prior:
   tissue-residency or chemokine-trafficking programs, regulatory/stromal
   interaction programs, stress/metabolic programs, and possible non-NK lineage
   contamination or doublets.
+- Treat positive and negative DE markers differently. Positive markers support
+  programs enriched in the cluster; negative markers identify programs depleted
+  in the cluster and can be useful exclusion evidence.
+- For cytokine-stimulated clusters, do not collapse distinct clusters into one
+  broad label if the evidence supports separable activation, CCR7-like, or
+  cycling/proliferative patterns.
 - A new biological label should be suggested only when multiple independent
   evidence layers support a coherent program. Useful evidence can include
   repeated marker genes, coordinated DE programs, curated marker support,
