@@ -13,3 +13,51 @@ presentations/assets/
 
 # Local scratch
 tmp/
+
+# Local/generated output archives and scratch folders
+outputs.tar.gz
+outputs0/
+outputs/
+logs/
+
+# macOS / editor noise
+.DS_Store
+*.swp
+*.swo
+*~
+._*
+
+# Python caches
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Temporary/debug artifacts
+*.tmp
+*.temp
+*.bak
+debug/
+
+# Local/generated output archives and scratch folders
+outputs.tar.gz
+outputs0/
+outputs/
+logs/
+
+# macOS / editor noise
+.DS_Store
+*.swp
+*.swo
+*~
+._*
+
+# Python caches
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Temporary/debug artifacts
+*.tmp
+*.temp
+*.bak
+debug/
