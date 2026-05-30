@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any, TypedDict
 
 from nk_project.annotation_agent.marker_knowledge import KNOWN_REFINED_LABELS
 from nk_project.annotation_agent.prompts import SYSTEM_PROMPT, build_cluster_prompt
+from nk_project.annotation_agent.taxonomy_reference import allowed_nk_state_labels, allowed_nk_subtype_labels
+
+
+ALLOWED_NK_SUBTYPE_CALLS = allowed_nk_subtype_labels()
+ALLOWED_NK_STATE_CALLS = allowed_nk_state_labels()
+NK_SUBTYPE_CALLS_NO_UNSURE = [label for label in ALLOWED_NK_SUBTYPE_CALLS if label != "Unsure"]
+NK_STATE_CALLS_NO_UNSURE = [
+    label for label in ALLOWED_NK_STATE_CALLS if label not in {"Unsure", "Non-NK", "NA"}
+]
 
 
 class ClusterAgentState(TypedDict):
@@ -218,8 +228,15 @@ def normalize_decision(decision: dict[str, Any], evidence: dict[str, Any]) -> di
         if isinstance(value, str):
             value = [value]
         decision[key] = [str(item) for item in value]
+    decision["recommended_pairwise_comparisons"] = clean_pairwise_comparisons(
+        decision["recommended_pairwise_comparisons"]
+    )
+    decision.update(normalize_layered_annotation(decision, evidence))
     suggested_new_label = str(decision.get("suggested_new_label") or "").strip()
     new_label_reason = str(decision.get("new_label_reason") or "").strip()
+    agent_preferred_label = str(decision.get("agent_preferred_label") or "").strip()
+    current_final_label = str(decision.get("current_final_label") or "").strip()
+    label_action = normalize_label_action(decision.get("label_action"))
     candidate = str(decision.get("candidate_label") or "").strip()
     alternate_labels = [label for label in decision["alternate_labels"] if label in KNOWN_REFINED_LABELS]
 
@@ -232,9 +249,33 @@ def normalize_decision(decision: dict[str, Any], evidence: dict[str, Any]) -> di
         decision["concerns"].append(
             "Candidate label was not in the approved refined-label vocabulary and was moved to suggested_new_label."
         )
+    current_final_label = current_final_label or candidate
+    if current_final_label not in KNOWN_REFINED_LABELS:
+        current_final_label = candidate
+    agent_preferred_label = decision.get("final_structured_label", "Unsure")
+    # The LLM can recommend a preferred biological name, but approval is an
+    # external/human action. Keep the generated approved label conservative so
+    # script 04 does not silently train on a new free-text name.
+    approved_label = current_final_label
     for key in ["needs_more_iteration", "needs_human_review"]:
         decision[key] = bool(decision.get(key, False))
+    if bool(decision.pop("_layer_fallback_review", False)):
+        decision["needs_human_review"] = True
+    if bool(decision.pop("_pan_nk_non_nk_override", False)):
+        decision["needs_human_review"] = True
+        decision["concerns"].append(
+            "Model proposed Non-NK, but pan-NK markers remain broadly expressed; reassigned to best-supported NK subtype/state for review."
+        )
+    overwrite_recommendation = bool(decision.get("overwrite_recommendation", False))
+    decision["possible_novel_subtype"] = bool(decision.get("possible_novel_subtype", False))
+    decision["novel_subtype_reason"] = str(decision.get("novel_subtype_reason") or "").strip()
+    suggested_split_label = str(decision.get("suggested_split_label") or "").strip()
+    suggested_split_label_reason = str(decision.get("suggested_split_label_reason") or "").strip()
     if suggested_new_label:
+        decision["needs_human_review"] = True
+    if suggested_split_label:
+        decision["needs_human_review"] = True
+    if overwrite_recommendation:
         decision["needs_human_review"] = True
     if requires_new_label_audit(evidence) and not suggested_new_label and not new_label_reason:
         new_label_reason = (
@@ -242,11 +283,141 @@ def normalize_decision(decision: dict[str, Any], evidence: dict[str, Any]) -> di
             "reviewing worksheet notes and/or pairwise evidence."
         )
     decision["candidate_label"] = candidate
+    decision["current_final_label"] = current_final_label
+    decision["agent_preferred_label"] = agent_preferred_label
+    decision["approved_label"] = approved_label
+    decision["label_action"] = label_action
+    decision["overwrite_recommendation"] = overwrite_recommendation
     decision["alternate_labels"] = alternate_labels
     decision["suggested_new_label"] = suggested_new_label
     decision["new_label_reason"] = new_label_reason
+    decision["suggested_split_label"] = suggested_split_label
+    decision["suggested_split_label_reason"] = suggested_split_label_reason
     decision["stop_reason"] = str(decision.get("stop_reason") or "")
     return decision
+
+
+def normalize_layered_annotation(decision: dict[str, Any], evidence: dict[str, Any]) -> dict[str, str | bool]:
+    raw_subtype = decision.get("nk_subtype_call")
+    subtype = normalize_allowed_label(raw_subtype, ALLOWED_NK_SUBTYPE_CALLS)
+    needs_review = False
+    if subtype == "Unsure" and normalize_nk_call(raw_subtype) == "Non-NK":
+        subtype = "Non-NK"
+    if subtype == "Unsure" and normalize_nk_call(decision.get("nk_call", decision.get("lineage_call"))) == "Non-NK":
+        subtype = "Non-NK"
+    if subtype == "Non-NK":
+        if pan_nk_broadly_expressed(evidence):
+            subtype = best_taxonomy_label(evidence, "subtype") or "cNK"
+            state = best_taxonomy_label(evidence, "state") or "Homeostatic_quiescent"
+            return {
+                "nk_call": "NK",
+                "lineage_call": "NK",
+                "nk_subtype_call": subtype,
+                "nk_state_call": state,
+                "final_structured_label": build_final_structured_label(subtype, state),
+                "_pan_nk_non_nk_override": True,
+            }
+        return {"nk_call": "Non-NK", "lineage_call": "Non-NK", "nk_subtype_call": "Non-NK", "nk_state_call": "NA", "final_structured_label": "Non-NK"}
+    if subtype in {"Unsure", "NA"}:
+        subtype = best_taxonomy_label(evidence, "subtype") or "cNK"
+        needs_review = True
+    state = normalize_allowed_label(decision.get("nk_state_call"), ALLOWED_NK_STATE_CALLS)
+    if state in {"Unsure", "Non-NK", "NA"}:
+        state = best_taxonomy_label(evidence, "state") or "Homeostatic_quiescent"
+        needs_review = True
+    return {
+        "nk_call": "NK",
+        "lineage_call": "NK",
+        "nk_subtype_call": subtype,
+        "nk_state_call": state,
+        "final_structured_label": build_final_structured_label(subtype, state),
+        "_layer_fallback_review": needs_review,
+    }
+
+
+def best_taxonomy_label(evidence: dict[str, Any], layer: str) -> str:
+    allowed_labels = NK_SUBTYPE_CALLS_NO_UNSURE if layer == "subtype" else NK_STATE_CALLS_NO_UNSURE
+    allowed = set(allowed_labels)
+    for item in evidence.get("taxonomy_marker_hits", {}).get("top_matches", []):
+        if item.get("taxonomy_layer") != layer:
+            continue
+        label = str(item.get("taxonomy_label") or "").strip()
+        label = normalize_allowed_label(label, allowed_labels)
+        if label in allowed and label != "Non-NK":
+            return label
+    return ""
+
+
+def pan_nk_broadly_expressed(evidence: dict[str, Any]) -> bool:
+    summary = evidence.get("pan_nk_marker_summary", {})
+    try:
+        n_tested = int(summary.get("n_pan_nk_genes_tested") or 0)
+        median_pct = float(summary.get("median_pan_nk_pct_nz_cluster"))
+    except (TypeError, ValueError):
+        return False
+    return n_tested >= 4 and median_pct >= 0.5
+
+
+def normalize_nk_call(value: Any) -> str:
+    text = str(value or "").strip()
+    compact = text.lower().replace("_", " ").replace("-", " ").strip()
+    compact = re.sub(r"\s+", " ", compact)
+    if compact in {"nk", "natural killer"}:
+        return "NK"
+    if compact in {"unsure", "unknown", "ambiguous", "uncertain"}:
+        return "Unsure"
+    if compact in {
+        "non nk",
+        "nonnk",
+        "not nk",
+        "t",
+        "t cell",
+        "t cells",
+        "b",
+        "b cell",
+        "b cells",
+        "myeloid",
+        "erythroid",
+        "stromal",
+        "epithelial",
+    }:
+        return "Non-NK"
+    return "Unsure"
+
+
+def normalize_allowed_label(value: Any, allowed: list[str]) -> str:
+    text = str(value or "").strip()
+    if text in allowed:
+        return text
+    compact = text.lower().replace("_", "").replace("-", "").replace(" ", "").replace("(vivier2024)", "")
+    for label in allowed:
+        if label.lower().replace("_", "").replace("-", "").replace(" ", "") == compact:
+            return label
+    return "Unsure"
+
+
+def build_final_structured_label(subtype: str, state: str) -> str:
+    return "_".join([standardize_label_part(subtype), standardize_label_part(state)])
+
+
+def standardize_label_part(value: Any) -> str:
+    text = str(value or "Unsure").strip() or "Unsure"
+    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_") or "Unsure"
+
+
+def clean_pairwise_comparisons(items: list[str]) -> list[str]:
+    cleaned = []
+    for item in items:
+        for cluster_id in re.findall(r"\d+", str(item)):
+            if cluster_id not in cleaned:
+                cleaned.append(cluster_id)
+    return cleaned
+
+
+def normalize_label_action(value: Any) -> str:
+    action = str(value or "keep").strip().lower()
+    allowed = {"keep", "rename", "split", "merge", "uncertain"}
+    return action if action in allowed else "uncertain"
 
 
 def requires_new_label_audit(evidence: dict[str, Any]) -> bool:

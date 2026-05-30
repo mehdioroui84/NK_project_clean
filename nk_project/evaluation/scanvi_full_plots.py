@@ -19,12 +19,32 @@ from nk_project.io_utils import ensure_dirs
 
 
 PREFERRED_STATE_COLORS = {
+    # Keep historical colors for existing labels so new runs remain comparable
+    # with earlier SCANVI/refined-annotation figures.
+    "B": "#1f77b4",
+    "T": "#d62728",
     "Developmental": "#9ecae1",
-    "Proliferative": "#a1d99b",
-    "Regulatory": "#c7b9ff",
-    "Transitional Cytotoxic": "#f2d64b",
-    "Mature Cytotoxic": "#f39c34",
+    "Mature Cytotoxic": "#ffbb78",
+    "Mature Cytotoxic TCF7+": "#f7b6d2",
+    "Transitional Cytotoxic": "#ff9896",
+    "Transitional Cytotoxic Tissue-Resident": "#e377c2",
     "Cytokine-Stimulated": "#d62728",
+    "Cytokine-Stimulated CCR7+": "#aec7e8",
+    "Cytokine-Stimulated Cycling": "#17becf",
+    "Cytokine-Stimulated Proliferative": "#17becf",
+    "Proliferative": "#2ca02c",
+    "Regulatory": "#98df8a",
+    "Lung Cytotoxic NK": "#bcbd22",
+    "Lung DOCK4+ SLC8A1+ NK": "#8c564b",
+    "Unknown_Kidney": "#c49c94",
+    "Unknown_BM_1 Erythroid-like": "#c5b0d5",
+    "Myeloid-like": "#7f7f7f",
+    # New taxonomy-preferred labels get distinct colors from the old labels.
+    "Chemokine-Inflammatory T": "#54278f",
+    "NK1-like Mature Cytotoxic": "#7570b3",
+    "NK1-like Lung Cytotoxic": "#1b9e77",
+    "NK2-like Transitional Cytotoxic": "#e7298a",
+    "Unknown Lung Stromal-like": "#d95f02",
 }
 
 UMAP_POINT_SIZE = 0.08
@@ -357,84 +377,9 @@ def main(argv: list[str] | None = None):
     )
 
     png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_umap_panels.png")
-    pdf = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_umap_panels.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
-
-    fig_err, ax_err = plt.subplots(1, 1, figsize=(14, 12))
-    ax_err.scatter(
-        xy[eval_mask & correct, 0],
-        xy[eval_mask & correct, 1],
-        s=0.035,
-        alpha=0.24,
-        color="#2166ac",
-        label="Correct",
-        rasterized=True,
-    )
-    ax_err.scatter(
-        xy[eval_mask & ~correct, 0],
-        xy[eval_mask & ~correct, 1],
-        s=0.035,
-        alpha=0.24,
-        color="#d62728",
-        label="Incorrect",
-        rasterized=True,
-    )
-    clean_ax(ax_err)
-    ax_err.set_title(f"SCANVI correct vs incorrect, {panel_label} UMAP (error={err_rate:.1%})", fontsize=13)
-    ax_err.legend(
-        handles=[
-            Line2D([0], [0], marker="o", linestyle="", markersize=9, markerfacecolor="#2166ac", markeredgecolor="none", label="Correct"),
-            Line2D([0], [0], marker="o", linestyle="", markersize=9, markerfacecolor="#d62728", markeredgecolor="none", label="Incorrect"),
-        ],
-        frameon=False,
-        loc="upper left",
-        fontsize=10,
-    )
-    err_png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_incorrect_predictions_large.png")
-    err_pdf = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_incorrect_predictions_large.pdf")
-    fig_err.savefig(err_png, dpi=450, bbox_inches="tight", facecolor="white")
-    fig_err.savefig(err_pdf, bbox_inches="tight", facecolor="white")
-    print(f"[SAVE] {err_png}")
-    print(f"[SAVE] {err_pdf}")
-
-    fig_local, ax_local = plt.subplots(1, 1, figsize=(14, 12))
-    ax_local.scatter(
-        xy[eval_mask, 0],
-        xy[eval_mask, 1],
-        s=0.01,
-        alpha=0.02,
-        color="0.45",
-        rasterized=True,
-    )
-    hb = ax_local.hexbin(
-        xy[eval_mask, 0],
-        xy[eval_mask, 1],
-        C=(~correct[eval_mask]).astype(float),
-        reduce_C_function=np.mean,
-        gridsize=85,
-        mincnt=20,
-        cmap="Reds",
-        vmin=0,
-        vmax=1,
-        linewidths=0,
-        alpha=0.95,
-    )
-    clean_ax(ax_local)
-    ax_local.set_title(
-        f"SCANVI local error rate, {panel_label} UMAP (global error={err_rate:.1%})",
-        fontsize=13,
-    )
-    cbar = fig_local.colorbar(hb, ax=ax_local, fraction=0.035, pad=0.02)
-    cbar.set_label("fraction incorrect in local bin", fontsize=10)
-    local_png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_local_error_rate.png")
-    local_pdf = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_local_error_rate.pdf")
-    fig_local.savefig(local_png, dpi=450, bbox_inches="tight", facecolor="white")
-    fig_local.savefig(local_pdf, bbox_inches="tight", facecolor="white")
-    print(f"[SAVE] {local_png}")
-    print(f"[SAVE] {local_pdf}")
+    plt.close(fig)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

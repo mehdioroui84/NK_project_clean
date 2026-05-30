@@ -10,12 +10,19 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from configs import default_config as cfg
-from nk_project.annotation_agent.evidence import EvidencePaths, load_cluster_evidence, save_evidence_json
+from nk_project.annotation_agent.evidence import (
+    EvidencePaths,
+    compact_cluster_evidence,
+    load_cluster_evidence,
+    save_compact_evidence_json,
+    save_evidence_json,
+)
 from nk_project.annotation_agent.graph import run_cluster_agent
 from nk_project.annotation_agent.marker_knowledge import KNOWN_REFINED_LABELS
 from nk_project.annotation_agent.pairwise import (
     centroid_distance_table,
     cluster_distance_evidence_from_results,
+    cluster_sort_key,
     existing_pair_set,
     recommended_pairs_from_results,
     run_pairwise_de_for_pairs,
@@ -63,9 +70,7 @@ def main() -> None:
         pairwise_dir=pairwise_dir,
     )
     evidence = load_cluster_evidence(paths, top_n=args.top_de_genes)
-    evidence_path = os.path.join(outdir, "cluster_evidence_summaries.json")
-    save_evidence_json(evidence, evidence_path)
-    print(f"[SAVE] {evidence_path}")
+    save_evidence_outputs(evidence, outdir, args)
     print(f"[CLUSTERS] {len(evidence)}")
 
     if args.dry_run:
@@ -99,6 +104,7 @@ def main() -> None:
             outdir,
             args.groupby,
             review_threshold=args.review_threshold,
+            save_debug_trace=args.save_debug_evidence,
         )
     print("[DONE] Annotation agent draft complete.")
 
@@ -140,8 +146,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--distance-quantile",
         type=float,
-        default=0.90,
-        help="Centroid-distance quantile used to trigger same-label pairwise DE checks.",
+        default=0.50,
+        help="NK-like centroid-distance quantile used to trigger same-label pairwise DE checks.",
     )
     parser.add_argument(
         "--isolation-quantile",
@@ -180,6 +186,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--save-debug-evidence",
+        action="store_true",
+        help=(
+            "Deep/audit mode: send full evidence to the LLM and save full raw evidence "
+            "JSON plus JSONL decision traces under debug/. By default, the LLM receives "
+            "compact evidence for speed, and only compact evidence summaries plus review "
+            "tables are written."
+        ),
+    )
     args = parser.parse_args()
     if not 1 <= args.max_iterations <= 5:
         raise ValueError("--max-iterations must be between 1 and 5.")
@@ -198,8 +214,8 @@ def run_agent_round(evidence, outdir, args):
     ensure_dirs(outdir)
     results = []
     cluster_ids = [args.cluster_id] if args.cluster_id else sorted(evidence, key=cluster_sort_key)
-    partial_path = os.path.join(outdir, "cluster_decision_trace.partial.jsonl")
-    if os.path.exists(partial_path):
+    partial_path = debug_trace_path(outdir) if args.save_debug_evidence else None
+    if partial_path and os.path.exists(partial_path):
         os.remove(partial_path)
     for idx, cluster_id in enumerate(cluster_ids, start=1):
         if cluster_id not in evidence:
@@ -209,14 +225,15 @@ def run_agent_round(evidence, outdir, args):
         final = result["final_decision"]
         print(
             "[DRAFT] "
-            f"{cluster_id} -> {final['candidate_label']} "
+            f"{cluster_id} -> {final.get('final_structured_label', final['candidate_label'])} "
             f"(confidence={final['confidence_score']}/5, "
             f"iterations={len(result['iterations'])}, "
             f"review={final['needs_human_review']})"
         )
         results.append(result)
-        with open(partial_path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(result) + "\n")
+        if partial_path:
+            with open(partial_path, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(result) + "\n")
     return results
 
 
@@ -240,7 +257,15 @@ def run_pairwise_refinement(args, leiden_dir, marker_dir, input_h5ad, pairwise_d
             distance_evidence_csv=distance_evidence_csv,
         )
         evidence = load_cluster_evidence(paths, top_n=args.top_de_genes)
-        save_evidence_json(evidence, os.path.join(round_outdir, "cluster_evidence_summaries.json"))
+        if round_idx > 0 and final_results_by_cluster and distance_df is not None and not args.disable_distance_pairwise:
+            split_pairs, _ = same_label_distance_pairs_from_results(
+                list(final_results_by_cluster.values()),
+                distance_df,
+                min_quantile=args.distance_quantile,
+                max_pairs=args.max_distance_pairs_per_round,
+            )
+            add_same_label_split_candidates(evidence, split_pairs)
+        save_evidence_outputs(evidence, round_outdir, args)
         if active_cluster_ids is None or args.disable_locking:
             round_cluster_ids = [args.cluster_id] if args.cluster_id else sorted(evidence, key=cluster_sort_key)
         else:
@@ -293,6 +318,7 @@ def run_pairwise_refinement(args, leiden_dir, marker_dir, input_h5ad, pairwise_d
             round_outdir,
             args.groupby,
             review_threshold=args.review_threshold,
+            save_debug_trace=args.save_debug_evidence,
         )
         final_evidence = evidence
 
@@ -378,14 +404,16 @@ def run_pairwise_refinement(args, leiden_dir, marker_dir, input_h5ad, pairwise_d
             outdir,
             args.groupby,
             review_threshold=args.review_threshold,
+            save_debug_trace=args.save_debug_evidence,
         )
+        save_evidence_outputs(final_evidence, outdir, args)
 
 
 def run_agent_round_for_clusters(evidence, outdir, args, cluster_ids):
     ensure_dirs(outdir)
     results = []
-    partial_path = os.path.join(outdir, "cluster_decision_trace.partial.jsonl")
-    if os.path.exists(partial_path):
+    partial_path = debug_trace_path(outdir) if args.save_debug_evidence else None
+    if partial_path and os.path.exists(partial_path):
         os.remove(partial_path)
     for idx, cluster_id in enumerate(cluster_ids, start=1):
         if cluster_id not in evidence:
@@ -396,16 +424,47 @@ def run_agent_round_for_clusters(evidence, outdir, args, cluster_ids):
         status = classify_decision(final)
         print(
             "[DRAFT] "
-            f"{cluster_id} -> {final['candidate_label']} "
+            f"{cluster_id} -> {final.get('final_structured_label', final['candidate_label'])} "
             f"(confidence={final['confidence_score']}/5, "
             f"iterations={len(result['iterations'])}, "
             f"review={final['needs_human_review']}, "
             f"status={status})"
         )
         results.append(result)
-        with open(partial_path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(result) + "\n")
+        if partial_path:
+            with open(partial_path, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(result) + "\n")
     return results
+
+
+def save_evidence_outputs(evidence, outdir, args):
+    compact_path = os.path.join(outdir, "cluster_evidence_summary.json")
+    save_compact_evidence_json(evidence, compact_path)
+    print(f"[SAVE] {compact_path}")
+    if args.save_debug_evidence:
+        debug_dir = os.path.join(outdir, "debug")
+        ensure_dirs(debug_dir)
+        full_path = os.path.join(debug_dir, "cluster_evidence_full.json")
+        save_evidence_json(evidence, full_path)
+        print(f"[SAVE] {full_path}")
+
+
+def add_same_label_split_candidates(evidence, pairs):
+    by_cluster = {cluster_id: [] for cluster_id in evidence}
+    for a, b in pairs:
+        if a in by_cluster:
+            by_cluster[a].append(b)
+        if b in by_cluster:
+            by_cluster[b].append(a)
+    for cluster_id, others in by_cluster.items():
+        if others:
+            evidence[cluster_id]["same_label_split_candidates"] = sorted(set(others), key=cluster_sort_key)
+
+
+def debug_trace_path(outdir):
+    debug_dir = os.path.join(outdir, "debug")
+    ensure_dirs(debug_dir)
+    return os.path.join(debug_dir, "cluster_decision_trace.partial.jsonl")
 
 
 def classify_decision(final):
@@ -416,9 +475,10 @@ def classify_decision(final):
     technical = int(final.get("technical_concern_score", 5))
     needs_review = bool(final.get("needs_human_review", True))
     has_new_label = bool(str(final.get("suggested_new_label", "")).strip())
-    if approved and confidence >= 4 and ambiguity <= 2 and technical < 2 and not needs_review and not has_new_label:
+    overwrite = bool(final.get("overwrite_recommendation", False))
+    if approved and confidence >= 4 and ambiguity <= 2 and technical < 2 and not needs_review and not has_new_label and not overwrite:
         return "locked"
-    if approved and confidence >= 3 and ambiguity <= 2 and technical < 2 and not has_new_label:
+    if approved and confidence >= 3 and ambiguity <= 2 and technical < 2 and not has_new_label and not overwrite:
         return "low_priority_review"
     return "active_review"
 
@@ -431,8 +491,18 @@ def save_status_table(results, statuses, path):
         rows.append(
             {
                 "cluster_id": cluster_id,
-                "candidate_refined_label": final.get("candidate_label"),
+                "candidate_refined_label": final.get("final_structured_label", "Non-NK"),
+                "current_final_label": final.get("final_structured_label", "Non-NK"),
+                "nk_subtype_call": final.get("nk_subtype_call", "Non-NK"),
+                "nk_state_call": final.get("nk_state_call", "NA"),
+                "final_structured_label": final.get("final_structured_label", "Non-NK"),
+                "agent_preferred_label": final.get("final_structured_label", "Non-NK"),
+                "approved_label": final.get("final_structured_label", "Non-NK"),
+                "label_action": final.get("label_action", "keep"),
+                "overwrite_recommendation": final.get("overwrite_recommendation", False),
                 "suggested_new_label": final.get("suggested_new_label", ""),
+                "possible_novel_subtype": final.get("possible_novel_subtype", False),
+                "novel_subtype_reason": final.get("novel_subtype_reason", ""),
                 "review_status": statuses[cluster_id],
                 "confidence_score": final.get("confidence_score"),
                 "ambiguity_score": final.get("ambiguity_score"),
@@ -474,11 +544,12 @@ def run_one_cluster(evidence, cluster_id, args):
 
 
 def evidence_for_agent(cluster_evidence, args):
+    agent_evidence = copy.deepcopy(cluster_evidence) if args.save_debug_evidence else compact_cluster_evidence(cluster_evidence)
+    remove_legacy_annotation_priors(agent_evidence)
     if not bool(getattr(args, "discovery_first_active", False)):
-        return cluster_evidence
-    stripped = copy.deepcopy(cluster_evidence)
-    stripped["annotation_mode"] = "discovery_first_no_worksheet_draft"
-    comp = stripped.get("composition", {})
+        return agent_evidence
+    agent_evidence["annotation_mode"] = "discovery_first_no_worksheet_draft"
+    comp = agent_evidence.get("composition", {})
     for key in [
         "draft_refined_label",
         "draft_refined_label_raw",
@@ -486,9 +557,35 @@ def evidence_for_agent(cluster_evidence, args):
         "review_notes",
     ]:
         comp.pop(key, None)
-    for related in stripped.get("related_clusters", []):
+    for related in agent_evidence.get("related_clusters", []):
         related.pop("draft_refined_label", None)
-    return stripped
+    return agent_evidence
+
+
+def remove_legacy_annotation_priors(agent_evidence):
+    agent_evidence.pop("non_nk_marker_summary", None)
+    comp = agent_evidence.get("composition", {})
+    for key in [
+        "top_NK_State",
+        "top_NK_State_frac",
+        "manual_annotation_composition",
+        "draft_refined_label",
+        "draft_refined_label_raw",
+        "worksheet_review_note",
+        "review_notes",
+    ]:
+        comp.pop(key, None)
+    for related in agent_evidence.get("related_clusters", []):
+        for key in [
+            "top_NK_State",
+            "top_NK_State_frac",
+            "manual_annotation_composition",
+            "draft_refined_label",
+            "draft_refined_label_raw",
+            "worksheet_review_note",
+            "review_notes",
+        ]:
+            related.pop(key, None)
 
 
 def cluster_sort_key(value):

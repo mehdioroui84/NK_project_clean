@@ -8,6 +8,51 @@ from typing import Any
 import pandas as pd
 
 
+REVIEW_MAPPING_COLUMNS = [
+    "candidate_refined_label",
+    "nk_subtype_call",
+    "nk_state_call",
+    "final_structured_label",
+    "agent_preferred_label",
+    "agent_preferred_label_reason",
+    "label_action",
+    "needs_human_review",
+    "review_reason",
+    "n_cells",
+    "confidence_score_0_5",
+    "ambiguity_score_0_5",
+    "technical_concern_score_0_5",
+    "top_tissue",
+    "taxonomy_top_matches",
+    "n_iterations",
+    "n_pairwise_DE_compared",
+    "distance_review_flag",
+    "distance_review_reason",
+    "possible_novel_subtype",
+    "novel_subtype_reason",
+    "suggested_split_label",
+    "suggested_split_label_reason",
+    "recommended_pairwise_comparisons",
+]
+
+
+REPORT_SUMMARY_COLUMNS = [
+    "n_cells",
+    "candidate_refined_label",
+    "nk_subtype_call",
+    "nk_state_call",
+    "final_structured_label",
+    "agent_preferred_label",
+    "agent_preferred_label_reason",
+    "label_action",
+    "needs_human_review",
+    "review_reason",
+    "top_tissue",
+    "taxonomy_top_matches",
+    "confidence_score_0_5",
+]
+
+
 def write_outputs(
     results: list[dict[str, Any]],
     evidence: dict[str, dict[str, Any]],
@@ -15,8 +60,10 @@ def write_outputs(
     groupby: str,
     *,
     review_threshold: int,
+    save_debug_trace: bool = False,
 ) -> None:
     mapping = build_mapping_table(results, evidence, groupby, review_threshold=review_threshold)
+    mapping = mapping[[groupby] + [col for col in REVIEW_MAPPING_COLUMNS if col in mapping.columns]]
     mapping_path = os.path.join(outdir, "candidate_refined_label_mapping.csv")
     mapping.to_csv(mapping_path, index=False)
     print(f"[SAVE] {mapping_path}")
@@ -26,11 +73,14 @@ def write_outputs(
     review_flags.to_csv(flags_path, index=False)
     print(f"[SAVE] {flags_path}")
 
-    trace_path = os.path.join(outdir, "cluster_decision_trace.jsonl")
-    with open(trace_path, "w", encoding="utf-8") as handle:
-        for result in results:
-            handle.write(json.dumps(result) + "\n")
-    print(f"[SAVE] {trace_path}")
+    if save_debug_trace:
+        debug_dir = os.path.join(outdir, "debug")
+        os.makedirs(debug_dir, exist_ok=True)
+        trace_path = os.path.join(debug_dir, "cluster_decision_trace.jsonl")
+        with open(trace_path, "w", encoding="utf-8") as handle:
+            for result in results:
+                handle.write(json.dumps(result) + "\n")
+        print(f"[SAVE] {trace_path}")
 
     report_path = os.path.join(outdir, "cluster_annotation_report.md")
     with open(report_path, "w", encoding="utf-8") as handle:
@@ -67,30 +117,38 @@ def build_mapping_table(
             final,
             needs_review=needs_review,
             review_threshold=review_threshold,
-            worksheet_note=comp.get("worksheet_review_note"),
+            worksheet_note=None,
             n_pairwise_de=len(evidence[cluster_id].get("pairwise_de_evidence", [])),
         )
         rows.append(
             {
                 groupby: cluster_id,
-                "candidate_refined_label": final["candidate_label"],
+                "candidate_refined_label": final.get("final_structured_label", "Non-NK"),
+                "nk_subtype_call": final.get("nk_subtype_call", "Non-NK"),
+                "nk_state_call": final.get("nk_state_call", "NA"),
+                "final_structured_label": final.get("final_structured_label", "Non-NK"),
+                "agent_preferred_label": final.get("final_structured_label", "Non-NK"),
+                "label_action": final.get("label_action", "keep"),
                 "needs_human_review": needs_review,
                 "review_reason": review_reason,
                 "n_cells": comp.get("n_cells"),
-                "top_original_label": comp.get("top_NK_State"),
-                "top_original_label_frac": comp.get("top_NK_State_frac"),
                 "confidence_score_0_5": final["confidence_score"],
                 "ambiguity_score_0_5": final["ambiguity_score"],
                 "technical_concern_score_0_5": final["technical_concern_score"],
                 "top_tissue": comp.get("top_tissue"),
-                "worksheet_initial_draft_label": comp.get("draft_refined_label"),
+                "taxonomy_top_matches": format_taxonomy_matches(
+                    evidence[cluster_id].get("taxonomy_marker_hits", {}).get("top_matches", []),
+                    max_items=3,
+                ),
                 "n_iterations": len(result["iterations"]),
                 "n_pairwise_DE_compared": len(evidence[cluster_id].get("pairwise_de_evidence", [])),
-                "possible_novel_subtype": distance_evidence.get("possible_novel_subtype", False),
-                "novel_subtype_score_0_5": distance_evidence.get("novel_subtype_score_0_5", 0),
-                "novel_subtype_reason": distance_evidence.get("novel_subtype_reason", ""),
-                "alternative_name_suggestion": final.get("suggested_new_label", "") or "None",
-                "alternative_name_reason": build_alternative_name_reason(final),
+                "distance_review_flag": distance_evidence.get("distance_review_flag", False),
+                "distance_review_reason": distance_evidence.get("distance_review_reason", ""),
+                "possible_novel_subtype": final.get("possible_novel_subtype", distance_evidence.get("possible_novel_subtype", False)),
+                "novel_subtype_reason": final.get("novel_subtype_reason", "") or distance_evidence.get("novel_subtype_reason", ""),
+                "suggested_split_label": final.get("suggested_split_label", ""),
+                "suggested_split_label_reason": final.get("suggested_split_label_reason", ""),
+                "agent_preferred_label_reason": final.get("new_label_reason", ""),
                 "recommended_pairwise_comparisons": "; ".join(final["recommended_pairwise_comparisons"]),
             }
         )
@@ -113,22 +171,7 @@ def build_markdown_report(
         "## Summary",
         "",
         markdown_table(
-            mapping[
-                [
-                    groupby,
-                    "n_cells",
-                    "candidate_refined_label",
-                    "needs_human_review",
-                    "review_reason",
-                    "top_original_label",
-                    "top_original_label_frac",
-                    "top_tissue",
-                    "worksheet_initial_draft_label",
-                    "confidence_score_0_5",
-                    "alternative_name_suggestion",
-                    "alternative_name_reason",
-                ]
-            ]
+            mapping[[groupby] + [col for col in REPORT_SUMMARY_COLUMNS if col in mapping.columns]]
         ),
         "",
         "## Cluster Details",
@@ -143,8 +186,15 @@ def build_markdown_report(
             [
                 f"### Cluster {cluster_id}: {final['candidate_label']}",
                 "",
+                f"- Current final label: {final.get('current_final_label', final['candidate_label'])}",
+                f"- Agent preferred label: {final.get('agent_preferred_label', final.get('suggested_new_label', '') or final['candidate_label'])}",
+                f"- Layer 1 NK subtype call: {final.get('nk_subtype_call', 'Non-NK')}",
+                f"- Layer 2 NK state call: {final.get('nk_state_call', 'NA')}",
+                f"- Final structured label: {final.get('final_structured_label', 'Non-NK')}",
+                f"- Label action: {final.get('label_action', 'keep')}",
+                f"- Overwrite recommendation: {final.get('overwrite_recommendation', False)}",
+                f"- Approved label: {final.get('approved_label', final.get('current_final_label', final['candidate_label']))}",
                 f"- Confidence: {final['confidence_score']}/5",
-                f"- Manual support: {final['manual_annotation_support']}/5",
                 f"- Top DE support: {final['top_de_marker_support']}/5",
                 f"- Curated marker support: {final['curated_marker_support']}/5",
                 f"- Technical concern: {final['technical_concern_score']}/5",
@@ -152,11 +202,8 @@ def build_markdown_report(
                 f"- Needs human review: {final['needs_human_review']}",
                 f"- Suggested new label: {final.get('suggested_new_label', '') or 'None'}",
                 f"- New label reason: {final.get('new_label_reason', '') or 'None'}",
-                f"- Original/manual composition: {comp.get('top_NK_State')} ({comp.get('top_NK_State_frac')})",
-                f"- Original/manual composition top labels: {format_manual_composition(comp.get('manual_annotation_composition', [])) or 'None'}",
                 f"- Tissue: {comp.get('top_tissue')} ({comp.get('top_tissue_frac')})",
-                f"- Worksheet initial draft: {comp.get('draft_refined_label')}",
-                f"- Worksheet/script review hint: {comp.get('worksheet_review_note') or 'None'}",
+                f"- Top taxonomy matches: {format_taxonomy_matches(ev.get('taxonomy_marker_hits', {}).get('top_matches', []), max_items=5) or 'None'}",
                 f"- Pairwise evidence comparisons loaded: {len(ev.get('pairwise_de_evidence', []))}",
                 "",
                 "Top DE genes:",
@@ -191,17 +238,15 @@ def build_annotation_status_paragraph(
     n_review = int(review_df.shape[0])
     review_clusters = ", ".join(review_df[groupby].astype(str).tolist()) if n_review else "none"
     review_reasons = summarize_review_reasons(review_df["review_reason"].dropna().astype(str).tolist())
-    alternative_df = mapping.loc[
-        mapping["alternative_name_suggestion"].astype(str).str.lower().ne("none")
-    ].copy()
+    alternative_df = mapping.head(0).copy()
     alternative_summary = summarize_alternatives(alternative_df, groupby)
     n_pairwise = int(pd.to_numeric(mapping.get("n_pairwise_DE_compared", 0), errors="coerce").fillna(0).sum())
     lineage_summary = summarize_candidate_lineages(label_counts)
     confidence_median = float(pd.to_numeric(mapping["confidence_score_0_5"], errors="coerce").median())
 
     overview = (
-        f"The optional annotation agent reviewed {plural(total_clusters, 'Leiden 0.4 cluster')} using original/manual "
-        f"label composition, cluster-vs-rest marker evidence, curated marker programs, and "
+        f"The optional annotation agent reviewed {plural(total_clusters, 'Leiden 0.4 cluster')} using "
+        f"cluster-vs-rest marker evidence, positive/negative markers, Amina taxonomy marker support, metadata composition, and "
         f"{plural(n_pairwise, 'loaded pairwise DE comparison')}, assigning candidates across "
         f"{plural(len(label_counts), 'refined label')} ({label_summary}). "
         f"Overall, the naming pattern supports {lineage_summary}, with a median confidence score of "
@@ -212,178 +257,11 @@ def build_annotation_status_paragraph(
         "The candidate labels are therefore ready as a structured draft for manual sign-off, while the flagged clusters "
         "represent targeted review items rather than a broad failure of the refined annotation scheme."
     )
-    kept = build_kept_as_is_paragraph(results, evidence, mapping, groupby)
-    merged = build_merged_paragraph(results, evidence, mapping, groupby)
-    refined = build_refined_further_paragraph(results, evidence, mapping, groupby)
     return (
         "# Annotation Refinement Summary\n\n"
         + overview
-        + "\n\n"
-        + kept
-        + "\n\n"
-        + merged
-        + "\n\n"
-        + refined
         + "\n"
     )
-
-
-def build_kept_as_is_paragraph(
-    results: list[dict[str, Any]],
-    evidence: dict[str, dict[str, Any]],
-    mapping: pd.DataFrame,
-    groupby: str,
-) -> str:
-    kept = mapping.loc[
-        mapping["candidate_refined_label"].astype(str) == mapping["top_original_label"].astype(str)
-    ].copy()
-    if kept.empty:
-        return (
-            "Manual labels kept as-is: none of the top original/manual labels were retained exactly as the final "
-            "candidate label; all clusters were either merged, renamed for specificity, or flagged for review."
-        )
-    clauses = []
-    for label in sorted(kept["candidate_refined_label"].astype(str).unique()):
-        sub = kept.loc[kept["candidate_refined_label"].astype(str) == label]
-        clauses.append(label_rationale_clause(label, sub, results, evidence, groupby))
-    return (
-        "Manual labels kept as-is: "
-        + "; ".join(clauses)
-        + ". These labels were preserved because the original/manual composition, top DE genes, and curated marker "
-        "programs were already concordant, so the refinement step mainly served as evidence confirmation rather than "
-        "renaming."
-    )
-
-
-def build_merged_paragraph(
-    results: list[dict[str, Any]],
-    evidence: dict[str, dict[str, Any]],
-    mapping: pd.DataFrame,
-    groupby: str,
-) -> str:
-    clauses = []
-    for label in sorted(mapping["candidate_refined_label"].astype(str).unique()):
-        sub = mapping.loc[mapping["candidate_refined_label"].astype(str) == label].copy()
-        if sub.shape[0] < 2:
-            continue
-        original_labels = {
-            str(item)
-            for item in sub["top_original_label"].dropna().astype(str).tolist()
-            if str(item) and str(item).lower() != "none"
-        }
-        if len(original_labels) < 2 and sub.shape[0] < 3:
-            continue
-        clauses.append(label_rationale_clause(label, sub, results, evidence, groupby))
-    if not clauses:
-        return (
-            "Merged labels: no candidate refined class clearly merged multiple original/manual labels or several "
-            "related clusters in this draft."
-        )
-    return (
-        "Merged labels: "
-        + "; ".join(clauses)
-        + ". These merges collapse Leiden-level fragments into broader refined classes when related clusters shared "
-        "the same dominant functional program, marker support, and pairwise/related-cluster evidence, even if the "
-        "original top manual labels or tissue contexts differed."
-    )
-
-
-def build_refined_further_paragraph(
-    results: list[dict[str, Any]],
-    evidence: dict[str, dict[str, Any]],
-    mapping: pd.DataFrame,
-    groupby: str,
-) -> str:
-    refined = mapping.loc[
-        mapping["candidate_refined_label"].astype(str) != mapping["top_original_label"].astype(str)
-    ].copy()
-    if refined.empty:
-        return (
-            "Labels refined further: no cluster changed from its top original/manual label in this draft. Review should "
-            "therefore focus on confidence, technical flags, and any alternative-name suggestions rather than major "
-            "renaming decisions."
-        )
-    clauses = []
-    for label in sorted(refined["candidate_refined_label"].astype(str).unique()):
-        sub = refined.loc[refined["candidate_refined_label"].astype(str) == label]
-        clauses.append(label_rationale_clause(label, sub, results, evidence, groupby))
-    return (
-        "Labels refined further: "
-        + "; ".join(clauses)
-        + ". These refinements are the main biological changes from the original/manual annotation: they add specificity "
-        "when DE and curated markers support a more precise functional program, and they separate likely non-NK or "
-        "contamination-like groups when lineage markers conflict with the original state."
-    )
-
-
-def label_rationale_clause(
-    label: str,
-    rows: pd.DataFrame,
-    results: list[dict[str, Any]],
-    evidence: dict[str, dict[str, Any]],
-    groupby: str,
-) -> str:
-    cluster_ids = [str(item) for item in rows[groupby].astype(str).tolist()]
-    originals = sorted(
-        {
-            str(item)
-            for item in rows["top_original_label"].dropna().astype(str).tolist()
-            if str(item) and str(item).lower() != "none"
-        }
-    )
-    result_by_cluster = {str(result["cluster_id"]): result for result in results}
-    support = collect_support_phrases(cluster_ids, result_by_cluster)
-    genes = collect_top_genes(cluster_ids, evidence, max_genes=6)
-    original_text = ", ".join(originals) if originals else "no dominant original label"
-    support_text = "; ".join(support) if support else f"top genes included {', '.join(genes)}"
-    if genes and support:
-        support_text += f"; representative DE genes included {', '.join(genes)}"
-    return (
-        f"{label} (clusters {', '.join(cluster_ids)}; top original labels: {original_text}) "
-        f"because {support_text}"
-    )
-
-
-def collect_support_phrases(
-    cluster_ids: list[str],
-    result_by_cluster: dict[str, dict[str, Any]],
-    *,
-    max_phrases: int = 2,
-) -> list[str]:
-    phrases = []
-    seen = set()
-    for cluster_id in cluster_ids:
-        final = result_by_cluster.get(cluster_id, {}).get("final_decision", {})
-        for phrase in final.get("evidence_summary", []):
-            text = str(phrase).strip().rstrip(".")
-            if not text or text in seen:
-                continue
-            seen.add(text)
-            phrases.append(text)
-            if len(phrases) >= max_phrases:
-                return phrases
-    return phrases
-
-
-def collect_top_genes(
-    cluster_ids: list[str],
-    evidence: dict[str, dict[str, Any]],
-    *,
-    max_genes: int,
-) -> list[str]:
-    genes = []
-    seen = set()
-    for cluster_id in cluster_ids:
-        for gene in evidence.get(cluster_id, {}).get("top_gene_names", [])[:10]:
-            gene = str(gene)
-            key = gene.upper()
-            if key in seen:
-                continue
-            seen.add(key)
-            genes.append(gene)
-            if len(genes) >= max_genes:
-                return genes
-    return genes
 
 
 def format_counter(counter: Counter, *, max_items: int) -> str:
@@ -409,11 +287,11 @@ def summarize_review_reasons(reasons: list[str]) -> str:
 
 def summarize_alternatives(alternative_df: pd.DataFrame, groupby: str) -> str:
     if alternative_df.empty:
-        return "no alternative names were suggested because the approved candidate labels were judged sufficient"
+        return "no agent-preferred names differed from the candidate labels"
     rows = []
     for _, row in alternative_df.iterrows():
-        rows.append(f"cluster {row[groupby]}: {row['alternative_name_suggestion']}")
-    return f"{plural(len(rows), 'alternative name suggestion')} were made ({'; '.join(rows)})"
+        rows.append(f"cluster {row[groupby]}: {row['agent_preferred_label']}")
+    return f"{plural(len(rows), 'agent-preferred name suggestion')} differed from candidate labels ({'; '.join(rows)})"
 
 
 def summarize_candidate_lineages(label_counts: Counter) -> str:
@@ -522,16 +400,33 @@ def humanize_review_note(note: str) -> str:
     return "; ".join(parts)
 
 
-def format_manual_composition(entries: list[dict[str, Any]]) -> str:
+def format_taxonomy_matches(matches: list[dict[str, Any]], *, max_items: int) -> str:
     parts = []
-    for entry in entries or []:
-        label = entry.get("label")
-        fraction = entry.get("fraction")
-        n_cells = entry.get("n_cells")
-        if label is None:
+    for item in (matches or [])[:max_items]:
+        state = str(item.get("taxonomy_state", "")).strip()
+        if not state:
             continue
-        if fraction is None:
-            parts.append(str(label))
-        else:
-            parts.append(f"{label} ({float(fraction):.3f}, n={n_cells})")
+        support_level = str(item.get("support_level", "") or "").strip()
+        percent = item.get("percent_of_max_score")
+        core_hits = item.get("core_hits") or []
+        support_hits = item.get("support_hits") or []
+        context_hits = item.get("context_hits") or []
+        negative_low = item.get("negative_expected_low_hits") or []
+        contradictions = item.get("negative_contradictions") or []
+        evidence_bits = []
+        if support_level:
+            evidence_bits.append(support_level)
+        if percent is not None:
+            evidence_bits.append(f"{float(percent):.1f}% max")
+        if core_hits:
+            evidence_bits.append("CORE " + ",".join(map(str, core_hits[:4])))
+        if support_hits:
+            evidence_bits.append("SUPPORT " + ",".join(map(str, support_hits[:4])))
+        if context_hits:
+            evidence_bits.append("CONTEXT " + ",".join(map(str, context_hits[:3])))
+        if negative_low:
+            evidence_bits.append("expected-low " + ",".join(map(str, negative_low[:3])))
+        if contradictions:
+            evidence_bits.append("contradicts " + ",".join(map(str, contradictions[:3])))
+        parts.append(f"{state} ({'; '.join(evidence_bits)})")
     return "; ".join(parts)

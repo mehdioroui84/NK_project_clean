@@ -222,12 +222,9 @@ def plot_summary(summary: pd.DataFrame, fig_dir: str, suffix: str):
     ax.legend(frameon=False, loc="lower right")
     fig.tight_layout()
     png = os.path.join(fig_dir, f"scanvi_zeroshot_by_dataset_summary{suffix}.png")
-    pdf = os.path.join(fig_dir, f"scanvi_zeroshot_by_dataset_summary{suffix}.pdf")
     fig.savefig(png, dpi=180, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
 
 
 def safe_name(value) -> str:

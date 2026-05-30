@@ -1038,12 +1038,9 @@ def order_heatmap_columns(df: pd.DataFrame, mode: str = "clustered") -> pd.DataF
 
 def save_figure(fig, fig_dir: str, stem: str) -> None:
     png = os.path.join(fig_dir, f"{stem}.png")
-    pdf = os.path.join(fig_dir, f"{stem}.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
 
 
 def save_run_metadata(

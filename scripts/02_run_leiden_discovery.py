@@ -170,11 +170,8 @@ def plot_resolution_overview(adata, resolutions, outdir):
     fig.suptitle("Full-data SCVI latent space: Leiden resolution comparison", fontsize=15)
     plt.tight_layout()
     png = os.path.join(outdir, "full_leiden_resolution_overview.png")
-    pdf = os.path.join(outdir, "full_leiden_resolution_overview.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
     plt.close(fig)
 
 
@@ -229,11 +226,8 @@ def plot_single_resolution_overview(adata, resolution, outdir):
 
     plt.tight_layout()
     png = os.path.join(outdir, f"full_{groupby}_overview.png")
-    pdf = os.path.join(outdir, f"full_{groupby}_overview.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
     plt.close(fig)
 
 

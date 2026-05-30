@@ -20,8 +20,10 @@ DEFAULT_GROUPBY = "leiden_0_4"
 N_TOP_TABLE = 50
 N_TOP_PLOT_PER_CLUSTER = 3
 DEFAULT_MARKER_FDR = 0.02
-DEFAULT_MARKER_LOGFC = 0.25
-DEFAULT_MARKER_PCT_DIFF = 0.50
+DEFAULT_MARKER_LOGFC = 0.50
+DEFAULT_MARKER_PCT_DIFF = 0.10
+DEFAULT_MARKER_MIN_PCT = 0.10
+EXPRESSION_CMAP = "Reds"
 
 MARKER_SETS = {
     "NK_cytotoxic": [
@@ -175,7 +177,12 @@ def main():
         print("[SKIP] rank_genes_groups marker analysis")
 
     if not args.skip_curated_markers:
-        plot_curated_markers(ad, args.groupby, outdir)
+        plot_curated_markers(
+            ad,
+            args.groupby,
+            outdir,
+            marker_csv=args.curated_marker_csv,
+        )
     else:
         print("[SKIP] curated marker plots")
 
@@ -195,6 +202,15 @@ def parse_args():
     parser.add_argument("--groupby", default=DEFAULT_GROUPBY)
     parser.add_argument("--skip-rank-genes", action="store_true")
     parser.add_argument("--skip-curated-markers", action="store_true")
+    parser.add_argument(
+        "--curated-marker-csv",
+        default=None,
+        help=(
+            "Optional expanded curated marker CSV with at least gene_name and "
+            "marker_set or functional_state columns. If omitted, use the legacy "
+            "hardcoded marker programs."
+        ),
+    )
     parser.add_argument(
         "--marker-fdr",
         type=float,
@@ -217,10 +233,19 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--marker-min-pct",
+        type=float,
+        default=DEFAULT_MARKER_MIN_PCT,
+        help=(
+            "Minimum expression fraction on the relevant side: pct in cluster "
+            "for positive markers, pct in reference for negative markers."
+        ),
+    )
+    parser.add_argument(
         "--max-markers-per-cluster",
         type=int,
         default=N_TOP_TABLE,
-        help="Maximum filtered marker genes kept per cluster.",
+        help="Maximum filtered marker genes kept per cluster per direction.",
     )
     parser.add_argument(
         "--marker-direction",
@@ -260,17 +285,24 @@ def run_rank_genes(ad, groupby, outdir, args):
         fdr=args.marker_fdr,
         min_logfc=args.marker_logfc,
         min_pct_diff=args.marker_pct_diff,
+        min_pct=args.marker_min_pct,
         direction=args.marker_direction,
     )
-    filtered_markers = cap_markers_per_cluster(enriched_candidates, args.max_markers_per_cluster)
-    top_path = os.path.join(outdir, f"{groupby}_markers_top{args.max_markers_per_cluster}_per_cluster.csv")
+    filtered_markers = cap_markers_per_cluster_per_direction(enriched_candidates, args.max_markers_per_cluster)
+    top_path = os.path.join(
+        outdir,
+        f"{groupby}_markers_top{args.max_markers_per_cluster}_pos_top{args.max_markers_per_cluster}_neg_per_cluster.csv",
+    )
+    compat_top_path = os.path.join(outdir, f"{groupby}_markers_top{args.max_markers_per_cluster}_per_cluster.csv")
     filtered_markers.to_csv(top_path, index=False)
+    filtered_markers.to_csv(compat_top_path, index=False)
     print(f"[SAVE] {top_path}")
+    print(f"[SAVE] {compat_top_path}")
     print(
         "[FILTER] marker selection: "
-        f"FDR<{args.marker_fdr:g}, |logFC|>{args.marker_logfc:g}, "
-        f"|pct_diff|>{args.marker_pct_diff:g}, direction={args.marker_direction}, "
-        f"cap={args.max_markers_per_cluster}"
+        f"FDR<{args.marker_fdr:g}, |logFC|>={args.marker_logfc:g}, "
+        f"relevant pct>={args.marker_min_pct:g}, |delta_pct|>={args.marker_pct_diff:g}, "
+        f"direction={args.marker_direction}, cap_per_direction={args.max_markers_per_cluster}"
     )
     save_marker_filter_summary(
         filtered_markers,
@@ -278,7 +310,7 @@ def run_rank_genes(ad, groupby, outdir, args):
         all_markers["group"].astype(str).unique(),
         groupby,
         outdir,
-        max_markers_per_cluster=args.max_markers_per_cluster,
+        max_markers_per_cluster=max_selected_markers_per_cluster(args),
     )
 
     selected = select_plot_markers(filtered_markers, n_per_cluster=args.top_plot_markers_per_cluster)
@@ -293,12 +325,20 @@ def run_rank_genes(ad, groupby, outdir, args):
         print("[WARN] No selected markers passed filtering; skipping top-marker plots.")
 
 
-def plot_curated_markers(ad, groupby, outdir):
+def plot_curated_markers(ad, groupby, outdir, *, marker_csv=None):
+    if marker_csv:
+        print(f"[CURATED_MARKERS] Loading expanded marker CSV: {marker_csv}")
+        marker_definitions = load_expanded_curated_markers(marker_csv)
+        marker_sets = marker_sets_from_expanded_markers(marker_definitions)
+    else:
+        marker_definitions = None
+        marker_sets = MARKER_SETS
+
     present_sets = {
         name: [gene for gene in genes if gene in ad.var_names]
-        for name, genes in MARKER_SETS.items()
+        for name, genes in marker_sets.items()
     }
-    present_sets = {name: genes for name, genes in present_sets.items() if genes}
+    present_sets = {name: unique_preserve_order(genes) for name, genes in present_sets.items() if genes}
 
     marker_list = []
     marker_rows = []
@@ -309,7 +349,16 @@ def plot_curated_markers(ad, groupby, outdir):
             marker_rows.append({"marker_set": set_name, "gene": gene})
 
     marker_path = os.path.join(outdir, f"{groupby}_curated_marker_genes_present.csv")
-    pd.DataFrame(marker_rows).to_csv(marker_path, index=False)
+    marker_rows_df = pd.DataFrame(marker_rows)
+    if marker_definitions is not None and not marker_rows_df.empty:
+        marker_rows_df = marker_rows_df.merge(
+            marker_definitions,
+            left_on=["marker_set", "gene"],
+            right_on=["marker_set", "gene_name"],
+            how="left",
+        )
+        marker_rows_df = marker_rows_df.drop(columns=["gene_name"], errors="ignore")
+    marker_rows_df.to_csv(marker_path, index=False)
     print(f"[SAVE] {marker_path}")
 
     print(f"[PLOT] Full-data curated dotplot with {len(marker_list)} genes")
@@ -318,6 +367,7 @@ def plot_curated_markers(ad, groupby, outdir):
         var_names=present_sets,
         groupby=groupby,
         standard_scale="var",
+        cmap=EXPRESSION_CMAP,
         show=False,
         return_fig=True,
     )
@@ -332,6 +382,7 @@ def plot_curated_markers(ad, groupby, outdir):
         var_names=present_sets,
         groupby=groupby,
         standard_scale="var",
+        cmap=EXPRESSION_CMAP,
         show=False,
         return_fig=True,
     )
@@ -349,6 +400,41 @@ def plot_curated_markers(ad, groupby, outdir):
     print(f"[SAVE] {avg_path}")
 
 
+def load_expanded_curated_markers(marker_csv):
+    markers = pd.read_csv(marker_csv, dtype=str).fillna("")
+    if "gene_name" not in markers.columns:
+        raise KeyError(f"{marker_csv} must contain a 'gene_name' column.")
+    if "marker_set" not in markers.columns:
+        if "functional_state" not in markers.columns:
+            raise KeyError(f"{marker_csv} must contain 'marker_set' or 'functional_state'.")
+        markers["marker_set"] = markers["functional_state"]
+    markers["gene_name"] = markers["gene_name"].astype(str).str.strip()
+    markers["marker_set"] = markers["marker_set"].astype(str).str.strip()
+    markers = markers[(markers["gene_name"] != "") & (markers["marker_set"] != "")].copy()
+    if markers.empty:
+        raise ValueError(f"{marker_csv} did not contain any usable curated marker rows.")
+    return markers
+
+
+def marker_sets_from_expanded_markers(markers):
+    marker_sets = {}
+    for marker_set, group in markers.groupby("marker_set", sort=False):
+        marker_sets[str(marker_set)] = unique_preserve_order(group["gene_name"].astype(str).tolist())
+    return marker_sets
+
+
+def unique_preserve_order(values):
+    seen = set()
+    out = []
+    for value in values:
+        text = str(value)
+        if text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out
+
+
 def cluster_summary(adata, groupby):
     out = pd.DataFrame({"n_cells": adata.obs[groupby].value_counts().sort_index()})
     for col in [cfg.LABEL_KEY, cfg.DATASET_KEY, cfg.ASSAY_CLEAN_KEY, "tissue"]:
@@ -361,24 +447,32 @@ def cluster_summary(adata, groupby):
     return out.sort_values("n_cells", ascending=False)
 
 
-def filter_enriched_marker_candidates(all_markers, fdr, min_logfc, min_pct_diff, direction):
+def filter_enriched_marker_candidates(all_markers, fdr, min_logfc, min_pct_diff, min_pct, direction):
     markers = all_markers.copy()
     markers["pct_expr_group"], markers["pct_expr_reference"] = marker_pct_columns(markers)
     markers["pct_expr_diff"] = markers["pct_expr_group"] - markers["pct_expr_reference"]
 
-    for col in ["pvals_adj", "logfoldchanges", "pct_expr_diff", "scores"]:
+    for col in ["pvals_adj", "logfoldchanges", "pct_expr_group", "pct_expr_reference", "pct_expr_diff", "scores"]:
         if col in markers.columns:
             markers[col] = pd.to_numeric(markers[col], errors="coerce")
     markers["abs_logfoldchanges"] = markers["logfoldchanges"].abs()
     markers["abs_pct_expr_diff"] = markers["pct_expr_diff"].abs()
 
-    required = ["group", "pvals_adj", "logfoldchanges", "pct_expr_diff"]
+    required = ["group", "pvals_adj", "logfoldchanges", "pct_expr_group", "pct_expr_reference", "pct_expr_diff"]
     missing = [col for col in required if col not in markers.columns]
     if missing:
         raise KeyError(f"Missing required marker columns for filtering: {missing}")
 
-    up = (markers["logfoldchanges"] > min_logfc) & (markers["pct_expr_diff"] > min_pct_diff)
-    down = (markers["logfoldchanges"] < -min_logfc) & (markers["pct_expr_diff"] < -min_pct_diff)
+    up = (
+        (markers["logfoldchanges"] >= min_logfc)
+        & (markers["pct_expr_group"] >= min_pct)
+        & (markers["pct_expr_diff"] >= min_pct_diff)
+    )
+    down = (
+        (markers["logfoldchanges"] <= -min_logfc)
+        & (markers["pct_expr_reference"] >= min_pct)
+        & (markers["pct_expr_diff"] <= -min_pct_diff)
+    )
     if direction == "up":
         direction_mask = up
     elif direction == "down":
@@ -401,21 +495,32 @@ def sort_marker_candidates(markers):
     if "abs_scores" not in markers.columns and "scores" in markers.columns:
         markers["abs_scores"] = markers["scores"].abs()
 
-    sort_cols = ["group", "pvals_adj", "abs_logfoldchanges", "abs_pct_expr_diff"]
-    ascending = [True, True, False, False]
+    sort_cols = ["group"]
+    ascending = [True]
+    if "marker_direction" in markers.columns:
+        sort_cols.append("marker_direction")
+        ascending.append(True)
+    sort_cols.extend(["abs_logfoldchanges", "abs_pct_expr_diff", "pvals_adj"])
+    ascending.extend([False, False, True])
     if "scores" in markers.columns:
         sort_cols.append("abs_scores")
         ascending.append(False)
     return markers.sort_values(sort_cols, ascending=ascending)
 
 
-def cap_markers_per_cluster(markers, max_markers_per_cluster):
+def cap_markers_per_cluster_per_direction(markers, max_markers_per_direction):
     return (
         sort_marker_candidates(markers)
-        .groupby("group", group_keys=False)
-        .head(max_markers_per_cluster)
+        .groupby(["group", "marker_direction"], group_keys=False)
+        .head(max_markers_per_direction)
         .reset_index(drop=True)
     )
+
+
+def max_selected_markers_per_cluster(args):
+    if args.marker_direction == "both":
+        return args.max_markers_per_cluster * 2
+    return args.max_markers_per_cluster
 
 
 def marker_pct_columns(markers):
@@ -550,11 +655,8 @@ def plot_marker_filter_summary(summary, groupby, outdir, max_markers_per_cluster
 
     plt.tight_layout()
     png = os.path.join(outdir, f"{groupby}_filtered_marker_selection_counts.png")
-    pdf = os.path.join(outdir, f"{groupby}_filtered_marker_selection_counts.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
     plt.close(fig)
 
 
@@ -586,6 +688,7 @@ def save_dotplot(adata, selected, groupby, outdir):
         var_names=selected,
         groupby=groupby,
         standard_scale="var",
+        cmap=EXPRESSION_CMAP,
         show=False,
         return_fig=True,
     )
@@ -602,6 +705,7 @@ def save_matrixplot(adata, selected, groupby, outdir):
         var_names=selected,
         groupby=groupby,
         standard_scale="var",
+        cmap=EXPRESSION_CMAP,
         show=False,
         return_fig=True,
     )

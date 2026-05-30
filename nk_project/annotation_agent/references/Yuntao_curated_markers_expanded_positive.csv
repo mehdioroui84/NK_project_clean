@@ -1,0 +1,59 @@
+functional_state,marker_entry,marker_type,gene_name,marker_level,expected_direction,marker_set
+developmental,CD34,gene,CD34,high,positive,developmental
+developmental,MME,gene,MME,high,positive,developmental
+developmental,HLA-DRA,gene,HLA-DRA,high,positive,developmental
+developmental,KIT,gene,KIT,high,positive,developmental
+developmental,IL7R,gene,IL7R,high,positive,developmental
+Mature Cytotoxic,FCGR3A,gene,FCGR3A,high,positive,Mature Cytotoxic
+Mature Cytotoxic,Cytotoxicity,gene_set,GZMA,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,GZMB,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,GZMH,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,GZMM,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,GZMK,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,GNLY,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,PRF1,high,positive,Mature Cytotoxic: Cytotoxicity
+Mature Cytotoxic,Cytotoxicity,gene_set,CTSW,high,positive,Mature Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,NCAM1,gene,NCAM1,high,positive,Transitional Cytotoxic
+Transitional Cytotoxic,Cytotoxicity,gene_set,GZMA,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,GZMB,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,GZMH,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,GZMM,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,GZMK,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,GNLY,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,PRF1,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Transitional Cytotoxic,Cytotoxicity,gene_set,CTSW,intermediate/high,positive,Transitional Cytotoxic: Cytotoxicity
+Regulatory,NCAM1,gene,NCAM1,high,positive,Regulatory
+Regulatory,Inflammatory,gene_set,CCL2,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,CCL3,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,CCL4,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,CCL5,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,CXCL10,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,CXCL9,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,IL1B,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,IL6,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,IL7,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,IL15,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,IL18,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,IFNG,high,positive,Regulatory: Inflammatory
+Regulatory,Inflammatory,gene_set,TNF,high,positive,Regulatory: Inflammatory
+Cytokine-Stimulated,FCGR3A,gene,FCGR3A,high,positive,Cytokine-Stimulated
+Cytokine-Stimulated,MKI67,gene,MKI67,high,positive,Cytokine-Stimulated
+Cytokine-Stimulated,STMN1,gene,STMN1,high,positive,Cytokine-Stimulated
+Cytokine-Stimulated,Cytotoxicity,gene_set,GZMA,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,GZMB,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,GZMH,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,GZMM,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,GZMK,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,GNLY,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,PRF1,high,positive,Cytokine-Stimulated: Cytotoxicity
+Cytokine-Stimulated,Cytotoxicity,gene_set,CTSW,high,positive,Cytokine-Stimulated: Cytotoxicity
+Proliferative,MKI67,gene,MKI67,high,positive,Proliferative
+Proliferative,STMN1,gene,STMN1,high,positive,Proliferative
+T,CD3D,gene,CD3D,high,positive,T
+T,CD3E,gene,CD3E,high,positive,T
+T,CD3G,gene,CD3G,high,positive,T
+T,CD4,gene,CD4,high,positive,T
+T,CD8A,gene,CD8A,high,positive,T
+T,CD8B,gene,CD8B,high,positive,T
+B,CD19,gene,CD19,high,positive,B
+B,MS4A1,gene,MS4A1,high,positive,B

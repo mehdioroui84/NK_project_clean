@@ -1,0 +1,38 @@
+functional_state,gene_name,marker_level
+developmental,CD34,high
+developmental,MME,high
+developmental,HLA-DRA,high
+developmental,KIT,high
+developmental,IL7R,high
+developmental,IL2RB,low
+developmental,NCAM1,low
+developmental,FCGR3A,low
+developmental,Cytotoxicity,low
+Mature Cytotoxic,NCAM1,low
+Mature Cytotoxic,FCGR3A,high
+Mature Cytotoxic,Cytotoxicity,high
+Transitional Cytotoxic,NCAM1,high
+Transitional Cytotoxic,FCGR3A,low/intermediate
+Transitional Cytotoxic,Cytotoxicity,intermediate/high
+Regulartory,NCAM1,high
+Regulartory,FCGR3A,low
+Regulartory,Cytotoxicity,low
+Regulartory,Inflammatory,high
+Unconventional,NCAM1,low
+Unconventional,FCGR3A,low
+Cytokine-Stimulated,NCAM1,low
+Cytokine-Stimulated,FCGR3A,high
+Cytokine-Stimulated,MKI67,high
+Cytokine-Stimulated,STMN1,high
+Cytokine-Stimulated,Cytotoxicity,high
+Proliferative,MKI67,high
+Proliferative,STMN1,high
+Proliferative,Cytotoxicity,low
+T,CD3D,high
+T,CD3E,high
+T,CD3G,high
+T,CD4,high
+T,CD8A,high
+T,CD8B,high
+B,CD19,high
+B,MS4A1,high

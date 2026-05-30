@@ -103,7 +103,7 @@ def same_label_distance_pairs_from_results(
     distance_table: pd.DataFrame,
     *,
     active_cluster_ids: set[str] | None = None,
-    min_quantile: float = 0.90,
+    min_quantile: float = 0.50,
     max_pairs: int | None = None,
 ) -> tuple[list[tuple[str, str]], pd.DataFrame]:
     """Select same-label pairs whose centroids are unusually far apart.
@@ -120,7 +120,7 @@ def same_label_distance_pairs_from_results(
     for result in results:
         cluster_id = str(result["cluster_id"])
         final = result.get("final_decision", {})
-        label = str(final.get("candidate_label", "")).strip()
+        label = structured_label_from_final(final)
         suggested = str(final.get("suggested_new_label", "")).strip()
         if label:
             label_by_cluster[cluster_id] = label
@@ -133,6 +133,8 @@ def same_label_distance_pairs_from_results(
         label_a = label_by_cluster.get(cluster_a)
         label_b = label_by_cluster.get(cluster_b)
         if not label_a or label_a != label_b:
+            continue
+        if not is_nk_structured_label(label_a):
             continue
         if active_cluster_ids is not None and cluster_a not in active_cluster_ids and cluster_b not in active_cluster_ids:
             continue
@@ -153,7 +155,14 @@ def same_label_distance_pairs_from_results(
         return [], pd.DataFrame()
 
     candidate_df = pd.DataFrame(candidate_rows)
-    threshold = float(candidate_df["centroid_distance"].quantile(min_quantile))
+    nk_distances = []
+    for _, row in distance_table.iterrows():
+        label_a = label_by_cluster.get(str(row["cluster_a"]), "")
+        label_b = label_by_cluster.get(str(row["cluster_b"]), "")
+        if is_nk_structured_label(label_a) and is_nk_structured_label(label_b):
+            nk_distances.append(float(row["centroid_distance"]))
+    nk_distances = pd.Series(nk_distances, dtype=float).dropna()
+    threshold = float(nk_distances.quantile(min_quantile)) if not nk_distances.empty else float("nan")
     rows = []
     status_rows = []
     for item in candidate_rows:
@@ -193,17 +202,35 @@ def cluster_distance_evidence_from_results(
     if distance_table.empty:
         return pd.DataFrame()
     label_by_cluster = {}
-    alternative_by_cluster = {}
+    novelty_by_cluster = {}
+    novelty_reason_by_cluster = {}
     for result in results:
         cluster_id = str(result["cluster_id"])
         final = result.get("final_decision", {})
-        label_by_cluster[cluster_id] = str(final.get("candidate_label", "")).strip()
-        alternative_by_cluster[cluster_id] = str(final.get("suggested_new_label", "")).strip()
+        label_by_cluster[cluster_id] = structured_label_from_final(final)
+        novelty_by_cluster[cluster_id] = bool(final.get("possible_novel_subtype", False))
+        novelty_reason_by_cluster[cluster_id] = str(final.get("novel_subtype_reason", "")).strip()
 
+    distance_table = distance_table.copy()
+    distance_table["cluster_a"] = distance_table["cluster_a"].astype(str)
+    distance_table["cluster_b"] = distance_table["cluster_b"].astype(str)
     all_distances = pd.to_numeric(distance_table["centroid_distance"], errors="coerce").dropna()
     if all_distances.empty:
         return pd.DataFrame()
-    isolation_threshold = float(all_distances.quantile(isolation_quantile))
+    nk_pair_distances = []
+    for _, row in distance_table.iterrows():
+        label_a = label_by_cluster.get(str(row["cluster_a"]), "")
+        label_b = label_by_cluster.get(str(row["cluster_b"]), "")
+        if is_nk_structured_label(label_a) and is_nk_structured_label(label_b):
+            nk_pair_distances.append(float(row["centroid_distance"]))
+    nk_distances = pd.Series(nk_pair_distances, dtype=float).dropna()
+    distance_background = nk_distances if not nk_distances.empty else all_distances
+    global_distance_threshold = float(distance_background.quantile(distance_quantile))
+    nk_isolation_threshold = (
+        float(nk_distances.quantile(isolation_quantile))
+        if not nk_distances.empty
+        else np.nan
+    )
 
     rows = []
     for cluster_id in sorted(label_by_cluster, key=cluster_sort_key):
@@ -223,14 +250,8 @@ def cluster_distance_evidence_from_results(
         nearest_same = sub.loc[sub["other_label"] == label_by_cluster[cluster_id]]
         nearest_same_row = nearest_same.iloc[0] if not nearest_same.empty else None
         farthest_same_row = nearest_same.sort_values("centroid_distance", ascending=False).iloc[0] if not nearest_same.empty else None
-        same_label_distances = nearest_same["centroid_distance"].astype(float)
-        same_label_threshold = (
-            float(same_label_distances.quantile(distance_quantile))
-            if not same_label_distances.empty
-            else np.nan
-        )
+        same_label_threshold = global_distance_threshold
         nearest_distance = float(nearest["centroid_distance"])
-        isolation_percentile = float((all_distances <= nearest_distance).mean())
         farthest_same_distance = (
             float(farthest_same_row["centroid_distance"]) if farthest_same_row is not None else np.nan
         )
@@ -239,20 +260,41 @@ def cluster_distance_evidence_from_results(
             and not np.isnan(same_label_threshold)
             and farthest_same_distance >= same_label_threshold
         )
-        isolation_flag = bool(nearest_distance >= isolation_threshold)
-        possible_subtype = bool(same_label_distance_flag or isolation_flag)
+
+        label = label_by_cluster[cluster_id]
+        is_nk_cluster = is_nk_structured_label(label)
+        nk_neighbors = sub.loc[sub["other_label"].map(is_nk_structured_label)] if is_nk_cluster else pd.DataFrame()
+        nearest_nk_row = nk_neighbors.iloc[0] if not nk_neighbors.empty else None
+        nearest_nk_distance = float(nearest_nk_row["centroid_distance"]) if nearest_nk_row is not None else np.nan
+        isolation_percentile = (
+            float((nk_distances <= nearest_nk_distance).mean())
+            if is_nk_cluster and nearest_nk_row is not None and not nk_distances.empty
+            else np.nan
+        )
+        isolation_flag = bool(
+            is_nk_cluster
+            and nearest_nk_row is not None
+            and not np.isnan(nk_isolation_threshold)
+            and nearest_nk_distance >= nk_isolation_threshold
+        )
+        distance_review_flag = bool(same_label_distance_flag or isolation_flag)
         novelty_score = novelty_score_from_flags(
             same_label_distance_flag=same_label_distance_flag,
             isolation_flag=isolation_flag,
-            has_alternative=bool(alternative_by_cluster.get(cluster_id)),
+            has_alternative=novelty_by_cluster.get(cluster_id, False),
         )
         rows.append(
             {
                 "cluster_id": cluster_id,
                 "candidate_refined_label": label_by_cluster[cluster_id],
+                "final_structured_label": label_by_cluster[cluster_id],
                 "nearest_cluster": str(nearest["other_cluster"]),
                 "nearest_label": str(nearest["other_label"]),
                 "nearest_distance": nearest_distance,
+                "isolation_scope": "NK_only" if is_nk_cluster else "not_applicable_non_NK",
+                "nearest_nk_cluster": str(nearest_nk_row["other_cluster"]) if nearest_nk_row is not None else "",
+                "nearest_nk_distance": nearest_nk_distance,
+                "nk_isolation_threshold": nk_isolation_threshold,
                 "isolation_percentile": isolation_percentile,
                 "isolation_flag": isolation_flag,
                 "nearest_same_label_cluster": str(nearest_same_row["other_cluster"]) if nearest_same_row is not None else "",
@@ -260,17 +302,20 @@ def cluster_distance_evidence_from_results(
                 "farthest_same_label_cluster": str(farthest_same_row["other_cluster"]) if farthest_same_row is not None else "",
                 "farthest_same_label_distance": farthest_same_distance,
                 "same_label_distance_threshold": same_label_threshold,
+                "global_distance_threshold": global_distance_threshold,
                 "same_label_distance_flag": same_label_distance_flag,
-                "possible_novel_subtype": possible_subtype,
-                "novel_subtype_score_0_5": novelty_score,
-                "novel_subtype_reason": novelty_reason(
+                "distance_review_flag": distance_review_flag,
+                "distance_review_reason": novelty_reason(
                     same_label_distance_flag=same_label_distance_flag,
                     isolation_flag=isolation_flag,
                     farthest_same_label_cluster=str(farthest_same_row["other_cluster"]) if farthest_same_row is not None else "",
-                    nearest_cluster=str(nearest["other_cluster"]),
-                    nearest_distance=nearest_distance,
+                    nearest_cluster=str(nearest_nk_row["other_cluster"]) if nearest_nk_row is not None else "",
+                    nearest_distance=nearest_nk_distance,
                     isolation_percentile=isolation_percentile,
                 ),
+                "possible_novel_subtype": novelty_by_cluster.get(cluster_id, False),
+                "novel_subtype_score_0_5": novelty_score,
+                "novel_subtype_reason": novelty_reason_by_cluster.get(cluster_id, ""),
             }
         )
     return pd.DataFrame(rows)
@@ -298,15 +343,28 @@ def novelty_reason(
 ) -> str:
     reasons = []
     if same_label_distance_flag:
-        reasons.append(f"far from same-label cluster {farthest_same_label_cluster}")
+        reasons.append(f"far from same final-label cluster {farthest_same_label_cluster} and above global distance threshold")
     if isolation_flag:
         reasons.append(
-            f"isolated from nearest cluster {nearest_cluster} "
-            f"(distance={nearest_distance:.3f}, percentile={isolation_percentile:.2f})"
+            f"isolated from nearest NK cluster {nearest_cluster} "
+            f"(NK-only distance={nearest_distance:.3f}, NK-only percentile={isolation_percentile:.2f})"
         )
     if not reasons:
         reasons.append("no strong centroid-distance novelty signal")
     return "; ".join(reasons)
+
+
+def structured_label_from_final(final: dict[str, Any]) -> str:
+    for key in ["final_structured_label", "agent_preferred_label", "candidate_label"]:
+        value = str(final.get(key, "")).strip()
+        if value:
+            return value
+    return "Unsure"
+
+
+def is_nk_structured_label(label: Any) -> bool:
+    text = str(label or "").strip()
+    return bool(text) and text != "Non-NK"
 
 
 def extract_cluster_ids(text: str, valid_cluster_ids: set[str]) -> list[str]:

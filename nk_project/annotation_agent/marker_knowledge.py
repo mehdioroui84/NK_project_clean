@@ -1,5 +1,30 @@
 from __future__ import annotations
 
+PAN_NK_MARKERS: list[str] = [
+    "NCR1",
+    "KLRD1",
+    "KLRF1",
+    "NCAM1",
+    "EOMES",
+    "TBX21",
+    "NKG7",
+    "GNLY",
+    "PRF1",
+    "GZMB",
+    "GZMA",
+    "CST7",
+]
+
+
+NON_NK_MARKER_GROUPS: dict[str, list[str]] = {
+    "T": ["CD3D", "CD3E", "CD3G", "TRAC", "TRBC1", "TRBC2"],
+    "B": ["MS4A1", "CD79A", "CD79B", "CD19", "BANK1"],
+    "Myeloid": ["LYZ", "LST1", "S100A8", "S100A9", "CST3"],
+    "Erythroid": ["HBB", "HBA1", "HBA2", "AHSP"],
+    "Stromal_Epithelial": ["COL1A1", "DCN", "LUM", "EPCAM", "KRT8", "KRT18", "KRT19"],
+}
+
+
 MARKER_PROGRAMS: dict[str, list[str]] = {
     "NK cytotoxic": [
         "NKG7",

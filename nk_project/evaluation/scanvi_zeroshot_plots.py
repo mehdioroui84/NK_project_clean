@@ -26,6 +26,8 @@ LEGEND_MARKER_SIZE = 7
 
 
 PREFERRED_COLORS = {
+    # Keep historical colors for existing labels so taxonomy-preferred runs
+    # can be compared directly against earlier refined-v1 figures.
     "B": "#1f77b4",
     "T": "#d62728",
     "Mature Cytotoxic": "#ffbb78",
@@ -33,6 +35,7 @@ PREFERRED_COLORS = {
     "Transitional Cytotoxic": "#ff9896",
     "Transitional Cytotoxic Tissue-Resident": "#e377c2",
     "Cytokine-Stimulated CCR7+": "#aec7e8",
+    "Cytokine-Stimulated Cycling": "#17becf",
     "Cytokine-Stimulated Proliferative": "#17becf",
     "Proliferative": "#2ca02c",
     "Regulatory": "#98df8a",
@@ -41,6 +44,12 @@ PREFERRED_COLORS = {
     "Unknown_Kidney": "#c49c94",
     "Unknown_BM_1 Erythroid-like": "#c5b0d5",
     "Myeloid-like": "#7f7f7f",
+    # New taxonomy-preferred labels get distinct colors from the old labels.
+    "Chemokine-Inflammatory T": "#54278f",
+    "NK1-like Mature Cytotoxic": "#7570b3",
+    "NK1-like Lung Cytotoxic": "#1b9e77",
+    "NK2-like Transitional Cytotoxic": "#e7298a",
+    "Unknown Lung Stromal-like": "#d95f02",
 }
 
 
@@ -104,8 +113,6 @@ def main():
     )
 
     make_panel_plot(obs, xy, true, pred_label, confidence, certainty, correct, figdir, tabledir)
-    make_correct_incorrect_plot(xy, correct, figdir)
-    make_local_error_plot(xy, correct, figdir)
     print("[DONE] Zero-shot plotting complete.")
 
 
@@ -161,11 +168,8 @@ def make_panel_plot(obs, xy, true, pred_label, confidence, certainty, correct, f
     scatter_by_category(axes[2, 2], xy, assay, distinct_color_map(assay), legend=True, title="3.3 Assay clean")
 
     png = os.path.join(figdir, "scanvi_zeroshot_umap_panels.png")
-    pdf = os.path.join(figdir, "scanvi_zeroshot_umap_panels.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
     plt.close(fig)
 
 
@@ -193,60 +197,6 @@ def plot_per_class_metrics(ax, true, pred_label, color_map, tabledir):
     out = os.path.join(tabledir, "scanvi_zeroshot_per_class_accuracy_f1.csv")
     metrics.to_csv(out)
     print(f"[SAVE] {out}")
-
-
-def make_correct_incorrect_plot(xy, correct, figdir):
-    err_rate = 1.0 - float(np.mean(correct))
-    fig, ax = plt.subplots(1, 1, figsize=(14, 12))
-    ax.scatter(xy[correct, 0], xy[correct, 1], s=0.12, alpha=0.35, color="#2166ac", rasterized=True)
-    ax.scatter(xy[~correct, 0], xy[~correct, 1], s=0.12, alpha=0.35, color="#d62728", rasterized=True)
-    clean_ax(ax)
-    ax.set_title(f"Refined SCANVI zero-shot correct vs incorrect (error={err_rate:.1%})", fontsize=13)
-    ax.legend(
-        handles=[
-            Line2D([0], [0], marker="o", linestyle="", markersize=9, markerfacecolor="#2166ac", markeredgecolor="none", label="Correct"),
-            Line2D([0], [0], marker="o", linestyle="", markersize=9, markerfacecolor="#d62728", markeredgecolor="none", label="Incorrect"),
-        ],
-        frameon=False,
-        loc="upper left",
-        fontsize=10,
-    )
-    png = os.path.join(figdir, "scanvi_zeroshot_correct_incorrect.png")
-    pdf = os.path.join(figdir, "scanvi_zeroshot_correct_incorrect.pdf")
-    fig.savefig(png, dpi=450, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
-    print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
-    plt.close(fig)
-
-
-def make_local_error_plot(xy, correct, figdir):
-    err_rate = 1.0 - float(np.mean(correct))
-    fig, ax = plt.subplots(1, 1, figsize=(14, 12))
-    hb = ax.hexbin(
-        xy[:, 0],
-        xy[:, 1],
-        C=(~correct).astype(float),
-        reduce_C_function=np.mean,
-        gridsize=70,
-        mincnt=10,
-        cmap="Reds",
-        vmin=0,
-        vmax=1,
-        linewidths=0,
-        alpha=0.95,
-    )
-    clean_ax(ax)
-    ax.set_title(f"Refined SCANVI zero-shot local error rate (global error={err_rate:.1%})", fontsize=13)
-    cbar = fig.colorbar(hb, ax=ax, fraction=0.035, pad=0.02)
-    cbar.set_label("fraction incorrect in local bin", fontsize=10)
-    png = os.path.join(figdir, "scanvi_zeroshot_local_error_rate.png")
-    pdf = os.path.join(figdir, "scanvi_zeroshot_local_error_rate.pdf")
-    fig.savefig(png, dpi=450, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
-    print(f"[SAVE] {png}")
-    print(f"[SAVE] {pdf}")
-    plt.close(fig)
 
 
 def scatter_continuous(ax, xy, values, fig, title):

@@ -435,10 +435,6 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
         dpi=180,
         bbox_inches="tight",
     )
-    fig.savefig(
-        os.path.join(run_cfg.FIG_OUTDIR, "scanvi_surgery_vs_zeroshot_summary.pdf"),
-        bbox_inches="tight",
-    )
     plt.close(fig)
 
     per_class_path = os.path.join(run_cfg.TABLE_OUTDIR, "scanvi_surgery_vs_zeroshot_per_class.csv")
@@ -464,10 +460,6 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
     fig.savefig(
         os.path.join(run_cfg.FIG_OUTDIR, "scanvi_surgery_vs_zeroshot_per_class_f1.png"),
         dpi=180,
-        bbox_inches="tight",
-    )
-    fig.savefig(
-        os.path.join(run_cfg.FIG_OUTDIR, "scanvi_surgery_vs_zeroshot_per_class_f1.pdf"),
         bbox_inches="tight",
     )
     plt.close(fig)
