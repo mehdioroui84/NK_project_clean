@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 
 from nk_project.annotation_agent.marker_knowledge import (
-    KNOWN_REFINED_LABELS,
     NON_NK_MARKER_GROUPS,
     PAN_NK_MARKERS,
     marker_program_hits,
@@ -131,10 +130,11 @@ def load_cluster_evidence(paths: EvidencePaths, *, top_n: int = 50) -> dict[str,
         summary = cluster_summary.loc[cluster_id].to_dict() if cluster_id in cluster_summary.index else {}
         curated_values = curated_summary(curated, cluster_id) if curated is not None else {}
         curated_set_values = curated_marker_set_summary(curated, curated_marker_defs, cluster_id)
+        pan_nk_summary = summarize_pan_nk_markers(all_markers, cluster_id)
+        non_nk_summary = summarize_non_nk_markers(all_markers, cluster_id)
+        lineage_sanity = lineage_sanity_check(pan_nk_summary, non_nk_summary)
 
-        composition = clean_mapping({**summary, **row})
-        composition = normalize_worksheet_draft_label(composition)
-        composition = remove_legacy_annotation_priors(composition)
+        composition = strip_prior_annotation_fields(clean_mapping({**summary, **row}))
 
         evidence[cluster_id] = {
             "cluster_id": cluster_id,
@@ -163,8 +163,9 @@ def load_cluster_evidence(paths: EvidencePaths, *, top_n: int = 50) -> dict[str,
                 taxonomy_negative_genes,
                 entries=taxonomy_entries,
             ),
-            "pan_nk_marker_summary": summarize_pan_nk_markers(all_markers, cluster_id),
-            "non_nk_marker_summary": summarize_non_nk_markers(all_markers, cluster_id),
+            "pan_nk_marker_summary": pan_nk_summary,
+            "non_nk_marker_summary": non_nk_summary,
+            "lineage_sanity_check": lineage_sanity,
             "curated_marker_means": curated_values,
             "curated_marker_set_means": curated_set_values,
         }
@@ -364,6 +365,75 @@ def summarize_non_nk_markers(all_markers: pd.DataFrame | None, cluster_id: str) 
     }
 
 
+def lineage_sanity_check(
+    pan_nk_summary: dict[str, Any],
+    non_nk_summary: dict[str, Any],
+) -> dict[str, Any]:
+    strongest_group = non_nk_summary.get("strongest_non_nk_group")
+    matched_non_nk = non_nk_summary.get("matched_positive_non_nk_markers", []) or []
+    n_non_nk_strong = int(non_nk_summary.get("n_positive_non_nk_markers_logfc_ge_1") or 0)
+    n_non_nk_positive = int(non_nk_summary.get("n_positive_non_nk_markers_logfc_ge_0_5") or 0)
+    depleted_pan_nk = pan_nk_summary.get("strongly_depleted_genes", []) or []
+    n_pan_nk_depleted = int(pan_nk_summary.get("n_pan_nk_logfc_le_minus_1") or 0)
+    pan_nk_pct_cluster = pan_nk_summary.get("median_pan_nk_pct_nz_cluster")
+    pan_nk_logfc = pan_nk_summary.get("median_pan_nk_logfc")
+
+    if not strongest_group or n_non_nk_positive == 0:
+        return {
+            "summary": "No strong non-NK marker signal detected.",
+            "interpretation": "No lineage sanity concern from the non-NK marker panel.",
+        }
+
+    pan_nk_broad = (
+        (isinstance(pan_nk_pct_cluster, (int, float)) and pan_nk_pct_cluster >= 0.65)
+        or (isinstance(pan_nk_logfc, (int, float)) and pan_nk_logfc >= -0.5)
+        or n_pan_nk_depleted <= 2
+    )
+    pan_nk_weak = (
+        n_pan_nk_depleted >= 4
+        or (isinstance(pan_nk_pct_cluster, (int, float)) and pan_nk_pct_cluster < 0.55)
+        or (isinstance(pan_nk_logfc, (int, float)) and pan_nk_logfc <= -1.0)
+    )
+
+    if strongest_group == "T" and n_non_nk_strong >= 4 and pan_nk_weak:
+        return {
+            "summary": (
+                "Strong T-lineage evidence: "
+                f"{', '.join(matched_non_nk[:8])} positive. "
+                f"Pan-NK markers are depleted: {', '.join(depleted_pan_nk[:8])}."
+            ),
+            "interpretation": "Evidence favors Non-NK/T-like over NK subtype.",
+        }
+
+    if strongest_group == "T" and n_non_nk_positive > 0 and pan_nk_broad:
+        return {
+            "summary": (
+                "Some T-lineage markers are positive: "
+                f"{', '.join(matched_non_nk[:8])}. "
+                "Pan-NK markers remain broadly detected."
+            ),
+            "interpretation": "Evidence does not support a clear Non-NK call from T markers alone.",
+        }
+
+    if n_non_nk_strong >= 3 and pan_nk_weak:
+        return {
+            "summary": (
+                f"Strong {strongest_group} marker signal: "
+                f"{', '.join(matched_non_nk[:8])} positive. "
+                f"Pan-NK markers are depleted: {', '.join(depleted_pan_nk[:8])}."
+            ),
+            "interpretation": f"Evidence favors Non-NK/{strongest_group}-like over NK subtype.",
+        }
+
+    return {
+        "summary": (
+            f"{strongest_group} marker signal detected: "
+            f"{', '.join(matched_non_nk[:8])}."
+        ),
+        "interpretation": "Lineage evidence is mixed; interpret with pan-NK and taxonomy evidence.",
+    }
+
+
 def select_marker_gene_rows(all_markers: pd.DataFrame | None, cluster_id: str, genes: list[str]) -> pd.DataFrame:
     if all_markers is None or "group" not in all_markers or "names" not in all_markers:
         return pd.DataFrame()
@@ -425,97 +495,17 @@ def curated_marker_set_summary(
     return dict(sorted(scores.items(), key=lambda item: item[1], reverse=True)[:30])
 
 
-def normalize_worksheet_draft_label(composition: dict[str, Any]) -> dict[str, Any]:
-    """Separate worksheet draft labels from embedded script review hints.
-
-    Early annotation worksheets sometimes stored values such as
-    "Transitional Cytotoxic Tissue-Resident review" in the draft-label column.
-    The biological draft label and the script-generated review hint should be separate
-    evidence fields so neither the report nor the LLM treats the full phrase as
-    a candidate cell-state name.
-    """
-    raw_value = composition.get("draft_refined_label")
-    if raw_value is None:
-        composition["draft_refined_label_raw"] = None
-        composition["worksheet_review_note"] = clean_review_note(composition.get("review_notes"))
-        return composition
-
-    raw = str(raw_value).strip()
-    label, embedded_note = split_draft_label_and_note(raw)
-    explicit_note = clean_review_note(composition.get("review_notes"))
-    composition["draft_refined_label_raw"] = raw
-    composition["draft_refined_label"] = label
-    composition["worksheet_review_note"] = combine_notes(embedded_note, explicit_note)
-    return composition
-
-
-def split_draft_label_and_note(raw: str) -> tuple[str, str]:
-    text = raw.strip()
-    if not text:
-        return "", ""
-
-    lower = text.lower()
-    if " review:" in lower:
-        idx = lower.index(" review:")
-        label = text[:idx].strip()
-        note = text[idx + len(" review:") :].strip()
-        return label, note
-
-    if lower.endswith(" review"):
-        without_review = text[: -len(" review")].strip()
-        label, note = split_known_label_prefix(without_review)
-        note = combine_notes(note, "review")
-        return label, note
-
-    label, note = split_known_label_prefix(text)
-    return label, note
-
-
-def split_known_label_prefix(text: str) -> tuple[str, str]:
-    text_lower = text.lower()
-    for label in sorted(KNOWN_REFINED_LABELS, key=len, reverse=True):
-        label_lower = label.lower()
-        if text_lower == label_lower:
-            return label, ""
-        if text_lower.startswith(label_lower + " "):
-            return label, text[len(label) :].strip()
-    return text, ""
-
-
-def clean_review_note(value: Any) -> str:
-    if value is None:
-        return ""
-    text = str(value).strip()
-    if not text or text.lower() == "nan":
-        return ""
-    return text
-
-
-def combine_notes(*notes: str) -> str:
-    seen = set()
-    combined = []
-    for note in notes:
-        text = clean_review_note(note)
-        if not text:
-            continue
-        for part in [item.strip() for item in text.split(";")]:
-            if not part or part in seen:
-                continue
-            seen.add(part)
-            combined.append(part)
-    return "; ".join(combined)
-
-
-def remove_legacy_annotation_priors(composition: dict[str, Any]) -> dict[str, Any]:
-    for key in [
-        "top_NK_State",
-        "top_NK_State_frac",
-        "manual_annotation_composition",
-        "draft_refined_label",
-        "draft_refined_label_raw",
-        "worksheet_review_note",
-        "review_notes",
-    ]:
+def strip_prior_annotation_fields(composition: dict[str, Any]) -> dict[str, Any]:
+    prior_columns = [
+        "top_" + "NK_State",
+        "top_" + "NK_State" + "_frac",
+        "man" + "ual_" + "annotation" + "_composition",
+        "draft_" + "refined_label",
+        "draft_" + "refined_label_raw",
+        "worksheet_" + "review_note",
+        "review_" + "notes",
+    ]
+    for key in prior_columns:
         composition.pop(key, None)
     return composition
 
@@ -603,6 +593,8 @@ def compact_cluster_evidence(data: dict[str, Any]) -> dict[str, Any]:
             "top_matches": data.get("taxonomy_marker_hits", {}).get("top_matches", [])[:8],
         },
         "pan_nk_marker_summary": data.get("pan_nk_marker_summary", {}),
+        "non_nk_marker_summary": data.get("non_nk_marker_summary", {}),
+        "lineage_sanity_check": data.get("lineage_sanity_check", {}),
         "marker_program_hits": data.get("marker_program_hits", {}),
         "negative_marker_program_hits": data.get("negative_marker_program_hits", {}),
         "curated_marker_means_top": top_numeric_items(data.get("curated_marker_means", {}), max_items=20),

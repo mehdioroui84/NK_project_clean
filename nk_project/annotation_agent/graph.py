@@ -5,16 +5,18 @@ import re
 import time
 from typing import Any, TypedDict
 
-from nk_project.annotation_agent.marker_knowledge import KNOWN_REFINED_LABELS
-from nk_project.annotation_agent.prompts import SYSTEM_PROMPT, build_cluster_prompt
+from nk_project.annotation_agent.prompts import (
+    PAIRWISE_SPLIT_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_cluster_prompt,
+    build_pairwise_split_prompt,
+)
 from nk_project.annotation_agent.taxonomy_reference import allowed_nk_state_labels, allowed_nk_subtype_labels
 
 
-ALLOWED_NK_SUBTYPE_CALLS = allowed_nk_subtype_labels()
-ALLOWED_NK_STATE_CALLS = allowed_nk_state_labels()
-NK_SUBTYPE_CALLS_NO_UNSURE = [label for label in ALLOWED_NK_SUBTYPE_CALLS if label != "Unsure"]
-NK_STATE_CALLS_NO_UNSURE = [
-    label for label in ALLOWED_NK_STATE_CALLS if label not in {"Unsure", "Non-NK", "NA"}
+ALLOWED_NK_SUBTYPE_CALLS = [label for label in allowed_nk_subtype_labels() if label != "Unsure"]
+ALLOWED_NK_STATE_CALLS = [
+    label for label in allowed_nk_state_labels() if label not in {"Unsure", "Non-NK", "NA"}
 ]
 
 
@@ -34,7 +36,7 @@ def run_cluster_agent(
     evidence: dict[str, Any],
     *,
     active_llm: str,
-    max_iterations: int = 5,
+    max_iterations: int = 1,
     temperature: float = 0.0,
     llm_retries: int = 5,
     retry_sleep: float = 5.0,
@@ -59,6 +61,64 @@ def run_cluster_agent(
     }
 
 
+def run_pairwise_split_agent(
+    *,
+    cluster_a: str,
+    cluster_b: str,
+    structured_label: str,
+    evidence_a: dict[str, Any],
+    evidence_b: dict[str, Any],
+    decision_a: dict[str, Any],
+    decision_b: dict[str, Any],
+    active_llm: str,
+    temperature: float = 0.0,
+    llm_retries: int = 5,
+    retry_sleep: float = 5.0,
+) -> dict[str, Any]:
+    try:
+        from nk_project.annotation_agent.llm_factory import get_active_llm
+    except ImportError as exc:
+        raise ImportError(
+            "langchain-openai is required for LLM calls. Install local dependencies with "
+            "`pip install langchain-openai`."
+        ) from exc
+
+    llm = get_active_llm(temperature=float(temperature), active_llm=active_llm)
+    prompt = build_pairwise_split_prompt(
+        cluster_a=cluster_a,
+        cluster_b=cluster_b,
+        structured_label=structured_label,
+        evidence_a=evidence_a,
+        evidence_b=evidence_b,
+        decision_a=decision_a,
+        decision_b=decision_b,
+    )
+    messages = [
+        {"role": "system", "content": PAIRWISE_SPLIT_SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+    started = time.time()
+    print(f"[SPLIT_LLM_START] {cluster_a} vs {cluster_b} model={active_llm}", flush=True)
+    response = invoke_with_retry(
+        llm,
+        messages,
+        retries=int(llm_retries),
+        sleep_seconds=float(retry_sleep),
+        cluster_id=f"{cluster_a}_vs_{cluster_b}",
+        iteration=1,
+    )
+    elapsed = time.time() - started
+    print(f"[SPLIT_LLM_DONE] {cluster_a} vs {cluster_b} elapsed={elapsed:.1f}s", flush=True)
+    return normalize_pairwise_split_decision(
+        parse_json_response(response.content),
+        cluster_a=cluster_a,
+        cluster_b=cluster_b,
+        structured_label=structured_label,
+        decision_a=decision_a,
+        decision_b=decision_b,
+    )
+
+
 def build_graph():
     try:
         from langgraph.graph import END, StateGraph
@@ -75,18 +135,14 @@ def build_graph():
     graph.add_conditional_edges(
         "draft_or_revise",
         should_continue,
-        {
-            "continue": "draft_or_revise",
-            "finalize": "finalize",
-        },
+        {"continue": "draft_or_revise", "finalize": "finalize"},
     )
     graph.add_edge("finalize", END)
     return graph.compile()
 
 
 def draft_or_revise(state: ClusterAgentState) -> ClusterAgentState:
-    decision = call_llm_for_decision(state)
-    decision = normalize_decision(decision, state["evidence"])
+    decision = normalize_decision(call_llm_for_decision(state), state["evidence"])
     previous = list(state["previous_decisions"])
     previous.append(decision)
     state["previous_decisions"] = previous
@@ -95,13 +151,12 @@ def draft_or_revise(state: ClusterAgentState) -> ClusterAgentState:
 
 
 def should_continue(state: ClusterAgentState) -> str:
+    if not state["previous_decisions"]:
+        return "continue"
     last = state["previous_decisions"][-1]
     wants_more = bool(last.get("needs_more_iteration", False))
-    needs_review_pass = bool(last.get("needs_human_review", False)) and len(state["previous_decisions"]) < 2
     below_limit = int(state["iteration"]) <= int(state["max_iterations"])
-    if (wants_more or needs_review_pass) and below_limit:
-        return "continue"
-    return "finalize"
+    return "continue" if wants_more and below_limit else "finalize"
 
 
 def finalize(state: ClusterAgentState) -> ClusterAgentState:
@@ -109,7 +164,6 @@ def finalize(state: ClusterAgentState) -> ClusterAgentState:
     if int(state["iteration"]) > int(state["max_iterations"]):
         final["needs_more_iteration"] = False
         final["stop_reason"] = "Reached max iteration limit."
-        final["needs_human_review"] = True
     state["final_decision"] = final
     return state
 
@@ -123,10 +177,7 @@ def call_llm_for_decision(state: ClusterAgentState) -> dict[str, Any]:
             "`pip install langchain-openai`."
         ) from exc
 
-    llm = get_active_llm(
-        temperature=float(state["temperature"]),
-        active_llm=state["active_llm"],
-    )
+    llm = get_active_llm(temperature=float(state["temperature"]), active_llm=state["active_llm"])
     prompt = build_cluster_prompt(
         state["evidence"],
         state["previous_decisions"],
@@ -137,28 +188,20 @@ def call_llm_for_decision(state: ClusterAgentState) -> dict[str, Any]:
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": prompt},
     ]
-    cluster_id = state["evidence"].get("cluster_id", "unknown")
-    iteration = state["iteration"]
+    cluster_id = str(state["evidence"].get("cluster_id", "unknown"))
+    iteration = int(state["iteration"])
     started = time.time()
-    print(
-        f"[LLM_START] cluster={cluster_id} iteration={iteration} "
-        f"model={state['active_llm']}",
-        flush=True,
-    )
+    print(f"[LLM_START] cluster={cluster_id} iteration={iteration} model={state['active_llm']}", flush=True)
     response = invoke_with_retry(
         llm,
         messages,
         retries=int(state["llm_retries"]),
         sleep_seconds=float(state["retry_sleep"]),
-        cluster_id=str(cluster_id),
-        iteration=int(iteration),
+        cluster_id=cluster_id,
+        iteration=iteration,
     )
     elapsed = time.time() - started
-    print(
-        f"[LLM_DONE] cluster={cluster_id} iteration={iteration} "
-        f"elapsed={elapsed:.1f}s",
-        flush=True,
-    )
+    print(f"[LLM_DONE] cluster={cluster_id} iteration={iteration} elapsed={elapsed:.1f}s", flush=True)
     return parse_json_response(response.content)
 
 
@@ -180,7 +223,7 @@ def invoke_with_retry(
                 flush=True,
             )
             return llm.invoke(messages)
-        except Exception as exc:  # noqa: BLE001 - retry transient local APIM/network errors.
+        except Exception as exc:  # noqa: BLE001 - transient API/network errors are retried.
             last_error = exc
             if attempt >= retries:
                 break
@@ -209,141 +252,107 @@ def normalize_decision(decision: dict[str, Any], evidence: dict[str, Any]) -> di
     decision = dict(decision)
     cluster_id = str(evidence["cluster_id"])
     decision["cluster_id"] = str(decision.get("cluster_id") or cluster_id)
-    for key in [
-        "confidence_score",
-        "manual_annotation_support",
-        "top_de_marker_support",
-        "curated_marker_support",
-        "technical_concern_score",
-        "ambiguity_score",
-    ]:
-        decision[key] = clamp_score(decision.get(key))
-    for key in [
-        "alternate_labels",
-        "evidence_summary",
-        "concerns",
-        "recommended_pairwise_comparisons",
-    ]:
-        value = decision.get(key, [])
-        if isinstance(value, str):
-            value = [value]
-        decision[key] = [str(item) for item in value]
-    decision["recommended_pairwise_comparisons"] = clean_pairwise_comparisons(
-        decision["recommended_pairwise_comparisons"]
-    )
-    decision.update(normalize_layered_annotation(decision, evidence))
-    suggested_new_label = str(decision.get("suggested_new_label") or "").strip()
-    new_label_reason = str(decision.get("new_label_reason") or "").strip()
-    agent_preferred_label = str(decision.get("agent_preferred_label") or "").strip()
-    current_final_label = str(decision.get("current_final_label") or "").strip()
-    label_action = normalize_label_action(decision.get("label_action"))
-    candidate = str(decision.get("candidate_label") or "").strip()
-    alternate_labels = [label for label in decision["alternate_labels"] if label in KNOWN_REFINED_LABELS]
 
-    if candidate not in KNOWN_REFINED_LABELS:
-        if candidate and not suggested_new_label:
-            suggested_new_label = candidate
-            if not new_label_reason:
-                new_label_reason = "The model proposed this label, but it is not in the approved refined-label vocabulary."
-        candidate = choose_fallback_label(decision, alternate_labels)
-        decision["concerns"].append(
-            "Candidate label was not in the approved refined-label vocabulary and was moved to suggested_new_label."
-        )
-    current_final_label = current_final_label or candidate
-    if current_final_label not in KNOWN_REFINED_LABELS:
-        current_final_label = candidate
-    agent_preferred_label = decision.get("final_structured_label", "Unsure")
-    # The LLM can recommend a preferred biological name, but approval is an
-    # external/human action. Keep the generated approved label conservative so
-    # script 04 does not silently train on a new free-text name.
-    approved_label = current_final_label
-    for key in ["needs_more_iteration", "needs_human_review"]:
-        decision[key] = bool(decision.get(key, False))
-    if bool(decision.pop("_layer_fallback_review", False)):
-        decision["needs_human_review"] = True
-    if bool(decision.pop("_pan_nk_non_nk_override", False)):
-        decision["needs_human_review"] = True
-        decision["concerns"].append(
-            "Model proposed Non-NK, but pan-NK markers remain broadly expressed; reassigned to best-supported NK subtype/state for review."
-        )
-    overwrite_recommendation = bool(decision.get("overwrite_recommendation", False))
-    decision["possible_novel_subtype"] = bool(decision.get("possible_novel_subtype", False))
-    decision["novel_subtype_reason"] = str(decision.get("novel_subtype_reason") or "").strip()
-    suggested_split_label = str(decision.get("suggested_split_label") or "").strip()
-    suggested_split_label_reason = str(decision.get("suggested_split_label_reason") or "").strip()
-    if suggested_new_label:
-        decision["needs_human_review"] = True
-    if suggested_split_label:
-        decision["needs_human_review"] = True
-    if overwrite_recommendation:
-        decision["needs_human_review"] = True
-    if requires_new_label_audit(evidence) and not suggested_new_label and not new_label_reason:
-        new_label_reason = (
-            "No new label suggested: the approved candidate label was judged sufficient after "
-            "reviewing worksheet notes and/or pairwise evidence."
-        )
-    decision["candidate_label"] = candidate
-    decision["current_final_label"] = current_final_label
-    decision["agent_preferred_label"] = agent_preferred_label
-    decision["approved_label"] = approved_label
-    decision["label_action"] = label_action
-    decision["overwrite_recommendation"] = overwrite_recommendation
-    decision["alternate_labels"] = alternate_labels
-    decision["suggested_new_label"] = suggested_new_label
-    decision["new_label_reason"] = new_label_reason
-    decision["suggested_split_label"] = suggested_split_label
-    decision["suggested_split_label_reason"] = suggested_split_label_reason
-    decision["stop_reason"] = str(decision.get("stop_reason") or "")
-    return decision
+    subtype = normalize_allowed_label(decision.get("nk_subtype_call"), ALLOWED_NK_SUBTYPE_CALLS + ["Non-NK"])
+    state = normalize_allowed_label(decision.get("nk_state_call"), ALLOWED_NK_STATE_CALLS + ["NA"])
+    review_from_fallback = False
 
-
-def normalize_layered_annotation(decision: dict[str, Any], evidence: dict[str, Any]) -> dict[str, str | bool]:
-    raw_subtype = decision.get("nk_subtype_call")
-    subtype = normalize_allowed_label(raw_subtype, ALLOWED_NK_SUBTYPE_CALLS)
-    needs_review = False
-    if subtype == "Unsure" and normalize_nk_call(raw_subtype) == "Non-NK":
-        subtype = "Non-NK"
-    if subtype == "Unsure" and normalize_nk_call(decision.get("nk_call", decision.get("lineage_call"))) == "Non-NK":
-        subtype = "Non-NK"
     if subtype == "Non-NK":
         if pan_nk_broadly_expressed(evidence):
             subtype = best_taxonomy_label(evidence, "subtype") or "cNK"
             state = best_taxonomy_label(evidence, "state") or "Homeostatic_quiescent"
-            return {
-                "nk_call": "NK",
-                "lineage_call": "NK",
-                "nk_subtype_call": subtype,
-                "nk_state_call": state,
-                "final_structured_label": build_final_structured_label(subtype, state),
-                "_pan_nk_non_nk_override": True,
-            }
-        return {"nk_call": "Non-NK", "lineage_call": "Non-NK", "nk_subtype_call": "Non-NK", "nk_state_call": "NA", "final_structured_label": "Non-NK"}
-    if subtype in {"Unsure", "NA"}:
-        subtype = best_taxonomy_label(evidence, "subtype") or "cNK"
-        needs_review = True
-    state = normalize_allowed_label(decision.get("nk_state_call"), ALLOWED_NK_STATE_CALLS)
-    if state in {"Unsure", "Non-NK", "NA"}:
-        state = best_taxonomy_label(evidence, "state") or "Homeostatic_quiescent"
-        needs_review = True
+            review_from_fallback = True
+        else:
+            state = "NA"
+    else:
+        if subtype in {"", "Unsure", "NA"}:
+            subtype = best_taxonomy_label(evidence, "subtype") or "cNK"
+            review_from_fallback = True
+        if state in {"", "Unsure", "Non-NK", "NA"}:
+            state = best_taxonomy_label(evidence, "state") or "Homeostatic_quiescent"
+            review_from_fallback = True
+
+    final_label = "Non-NK" if subtype == "Non-NK" else build_final_structured_label(subtype, state)
+    free_label = standardize_free_label(decision.get("free_label") or final_label)
+    if final_label != "Non-NK" and free_label == "Non-NK":
+        free_label = final_label
+    if not free_label:
+        free_label = final_label
+
+    for key in ["evidence_summary", "concerns"]:
+        value = decision.get(key, [])
+        if isinstance(value, str):
+            value = [value]
+        decision[key] = [str(item).strip() for item in value if str(item).strip()]
+
+    if review_from_fallback:
+        decision["concerns"].append(
+            "Layer call was normalized from weak/invalid output; review the evidence."
+        )
+    if subtype != "Non-NK" and pan_nk_broadly_expressed(evidence) and str(decision.get("nk_subtype_call")) == "Non-NK":
+        decision["concerns"].append(
+            "Model proposed Non-NK, but pan-NK markers remain broadly expressed; kept as NK for review."
+        )
+
+    needs_review = bool(decision.get("needs_human_review", False)) or review_from_fallback
+    human_review_reason = str(decision.get("human_review_reason") or "").strip()
+    if needs_review and not human_review_reason:
+        human_review_reason = "; ".join(decision["concerns"][:3]) or "Evidence is uncertain."
+
     return {
-        "nk_call": "NK",
-        "lineage_call": "NK",
+        "cluster_id": decision["cluster_id"],
         "nk_subtype_call": subtype,
         "nk_state_call": state,
-        "final_structured_label": build_final_structured_label(subtype, state),
-        "_layer_fallback_review": needs_review,
+        "final_structured_label": final_label,
+        "free_label": free_label,
+        "free_label_reason": str(decision.get("free_label_reason") or "").strip(),
+        "confidence_score": clamp_score(decision.get("confidence_score")),
+        "tissue_specificity_score": clamp_score(decision.get("tissue_specificity_score")),
+        "dataset_assay_specificity_score": clamp_score(decision.get("dataset_assay_specificity_score")),
+        "evidence_summary": decision["evidence_summary"],
+        "concerns": decision["concerns"],
+        "needs_human_review": needs_review,
+        "human_review_reason": human_review_reason,
+        "needs_more_iteration": bool(decision.get("needs_more_iteration", False)),
+        "stop_reason": str(decision.get("stop_reason") or ""),
+    }
+
+
+def normalize_pairwise_split_decision(
+    decision: dict[str, Any],
+    *,
+    cluster_a: str,
+    cluster_b: str,
+    structured_label: str,
+    decision_a: dict[str, Any],
+    decision_b: dict[str, Any],
+) -> dict[str, Any]:
+    decision = dict(decision)
+    split_supported = bool(decision.get("split_supported", False))
+    label_a = standardize_free_label(decision.get("cluster_a_free_label") or decision_a.get("free_label") or structured_label)
+    label_b = standardize_free_label(decision.get("cluster_b_free_label") or decision_b.get("free_label") or structured_label)
+    return {
+        "cluster_a": cluster_a,
+        "cluster_b": cluster_b,
+        "final_structured_label": structured_label,
+        "split_supported": split_supported,
+        "cluster_a_free_label": label_a,
+        "cluster_a_free_label_reason": str(decision.get("cluster_a_free_label_reason") or "").strip(),
+        "cluster_b_free_label": label_b,
+        "cluster_b_free_label_reason": str(decision.get("cluster_b_free_label_reason") or "").strip(),
+        "needs_human_review": bool(decision.get("needs_human_review", split_supported)),
+        "human_review_reason": str(decision.get("human_review_reason") or "").strip(),
     }
 
 
 def best_taxonomy_label(evidence: dict[str, Any], layer: str) -> str:
-    allowed_labels = NK_SUBTYPE_CALLS_NO_UNSURE if layer == "subtype" else NK_STATE_CALLS_NO_UNSURE
+    allowed_labels = ALLOWED_NK_SUBTYPE_CALLS if layer == "subtype" else ALLOWED_NK_STATE_CALLS
     allowed = set(allowed_labels)
     for item in evidence.get("taxonomy_marker_hits", {}).get("top_matches", []):
         if item.get("taxonomy_layer") != layer:
             continue
-        label = str(item.get("taxonomy_label") or "").strip()
-        label = normalize_allowed_label(label, allowed_labels)
-        if label in allowed and label != "Non-NK":
+        label = normalize_allowed_label(item.get("taxonomy_label"), allowed_labels)
+        if label in allowed:
             return label
     return ""
 
@@ -358,40 +367,13 @@ def pan_nk_broadly_expressed(evidence: dict[str, Any]) -> bool:
     return n_tested >= 4 and median_pct >= 0.5
 
 
-def normalize_nk_call(value: Any) -> str:
-    text = str(value or "").strip()
-    compact = text.lower().replace("_", " ").replace("-", " ").strip()
-    compact = re.sub(r"\s+", " ", compact)
-    if compact in {"nk", "natural killer"}:
-        return "NK"
-    if compact in {"unsure", "unknown", "ambiguous", "uncertain"}:
-        return "Unsure"
-    if compact in {
-        "non nk",
-        "nonnk",
-        "not nk",
-        "t",
-        "t cell",
-        "t cells",
-        "b",
-        "b cell",
-        "b cells",
-        "myeloid",
-        "erythroid",
-        "stromal",
-        "epithelial",
-    }:
-        return "Non-NK"
-    return "Unsure"
-
-
 def normalize_allowed_label(value: Any, allowed: list[str]) -> str:
     text = str(value or "").strip()
     if text in allowed:
         return text
-    compact = text.lower().replace("_", "").replace("-", "").replace(" ", "").replace("(vivier2024)", "")
+    compact = re.sub(r"[^a-z0-9]+", "", text.lower())
     for label in allowed:
-        if label.lower().replace("_", "").replace("-", "").replace(" ", "") == compact:
+        if re.sub(r"[^a-z0-9]+", "", label.lower()) == compact:
             return label
     return "Unsure"
 
@@ -401,46 +383,16 @@ def build_final_structured_label(subtype: str, state: str) -> str:
 
 
 def standardize_label_part(value: Any) -> str:
-    text = str(value or "Unsure").strip() or "Unsure"
-    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_") or "Unsure"
+    text = str(value or "").strip()
+    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_") or "Unknown"
 
 
-def clean_pairwise_comparisons(items: list[str]) -> list[str]:
-    cleaned = []
-    for item in items:
-        for cluster_id in re.findall(r"\d+", str(item)):
-            if cluster_id not in cleaned:
-                cleaned.append(cluster_id)
-    return cleaned
-
-
-def normalize_label_action(value: Any) -> str:
-    action = str(value or "keep").strip().lower()
-    allowed = {"keep", "rename", "split", "merge", "uncertain"}
-    return action if action in allowed else "uncertain"
-
-
-def requires_new_label_audit(evidence: dict[str, Any]) -> bool:
-    composition = evidence.get("composition", {})
-    worksheet_note = str(composition.get("worksheet_review_note") or "").strip()
-    pairwise = evidence.get("pairwise_de_evidence") or []
-    return bool(worksheet_note or pairwise)
-
-
-def choose_fallback_label(decision: dict[str, Any], alternate_labels: list[str]) -> str:
-    if alternate_labels:
-        return alternate_labels[0]
-    label_text = " ".join(
-        [
-            str(decision.get("candidate_label", "")),
-            " ".join(map(str, decision.get("evidence_summary", []))),
-            " ".join(map(str, decision.get("concerns", []))),
-        ]
-    ).lower()
-    for label in KNOWN_REFINED_LABELS:
-        if label.lower() in label_text:
-            return label
-    return "Mature Cytotoxic"
+def standardize_free_label(value: Any) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"\s+", "_", text)
+    text = re.sub(r"[^A-Za-z0-9_+.-]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text
 
 
 def clamp_score(value: Any) -> int:

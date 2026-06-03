@@ -50,6 +50,45 @@ PREFERRED_COLORS = {
     "NK1-like Lung Cytotoxic": "#1b9e77",
     "NK2-like Transitional Cytotoxic": "#e7298a",
     "Unknown Lung Stromal-like": "#d95f02",
+    # Current subtype/state annotation colors. Keep these synchronized with
+    # scripts/04_apply_refined_v1_labels.py and scanvi_full_plots.py.
+    "L6_Developmental_immature_Proliferating": "#E7298A",
+    "L6_Developmental_immature": "#E7298A",
+    "NK1_Chemokine_inflammatory": "#0072B2",
+    "NK1_Cytotoxic_activated": "#D55E00",
+    "NK1_Checkpoint_exhausted": "#7570B3",
+    "NK1_Proliferating": "#80B1D3",
+    "NK2_Chemokine_inflammatory": "#33A02C",
+    "NK2_CIMP_cytokine_primed_memory_like": "#F0E442",
+    "NK2_Checkpoint_exhausted": "#CC79A7",
+    "NK2_Cytotoxic_activated": "#009E73",
+    "NK2_ER_stress_UPR": "#8DD3C7",
+    "NK2_Homeostatic_quiescent": "#B2DF8A",
+    "NK2_Proliferating": "#56B4E9",
+    "cNK_Cytotoxic_activated": "#8C2D04",
+    "cNK_Metabolic_stress_hypoxia": "#00A6D6",
+    "cNK_Homeostatic_quiescent": "#A65628",
+    "cNK_Proliferating": "#CAB2D6",
+    "cNK_ER_stress_UPR": "#7B3294",
+    "trNK_Chemokine_inflammatory": "#A6761D",
+    "trNK_Homeostatic_quiescent": "#FF7F00",
+    "Non-NK": "#8A8A8A",
+    "Unsure_Chemokine_inflammatory": "#E6AB02",
+    "Unsure_Homeostatic_quiescent": "#8DA0CB",
+    "Unsure_Proliferating": "#FB8072",
+}
+
+PREFERRED_TISSUE_COLORS = {
+    "blood": "#D62728",
+    "cord blood": "#FF7F00",
+    "bone marrow": "#9467BD",
+    "lung": "#56B4E9",
+    "liver": "#8C564B",
+    "kidney": "#2CA02C",
+    "spleen": "#D33682",
+    "lymph node": "#F0E442",
+    "thymus": "#BCBD22",
+    "decidua": "#E377C2",
 }
 
 
@@ -163,7 +202,14 @@ def make_panel_plot(obs, xy, true, pred_label, confidence, certainty, correct, f
     scatter_continuous(axes[1, 1], xy, certainty, fig, "2.2 Certainty")
     plot_per_class_metrics(axes[1, 2], true, pred_label, state_colors, tabledir)
 
-    scatter_by_category(axes[2, 0], xy, tissue, distinct_color_map(tissue), legend=True, title="3.1 Tissue")
+    scatter_by_category(
+        axes[2, 0],
+        xy,
+        tissue,
+        distinct_color_map(tissue, preferred=PREFERRED_TISSUE_COLORS),
+        legend=True,
+        title="3.1 Tissue",
+    )
     scatter_by_category(axes[2, 1], xy, dataset, distinct_color_map(dataset), legend=False, title="3.2 Dataset ID")
     scatter_by_category(axes[2, 2], xy, assay, distinct_color_map(assay), legend=True, title="3.3 Assay clean")
 

@@ -231,6 +231,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-h5ad", default=None)
     parser.add_argument("--ref-outdir", default=None, help="Default: outputs/refined_scanvi_v1")
     parser.add_argument("--model-dir", default=None)
+    parser.add_argument(
+        "--query-model-reference-h5ad",
+        default=None,
+        help=(
+            "Use when --input-h5ad is query data, such as in-house zero-shot cells. "
+            "The SCANVI model is loaded with this reference h5ad, then the input h5ad "
+            "is registered as query data with transferred fields."
+        ),
+    )
     parser.add_argument("--obs-csv", default=None)
     parser.add_argument("--proba-csv", default=None)
     parser.add_argument("--train-names", default=None)
@@ -513,9 +522,60 @@ def load_aligned_inputs(
 def load_scanvi_model(model_dir: str, adata, args: argparse.Namespace):
     require_dir(model_dir)
     print(f"[LOAD] {model_dir}")
-    model = sca.models.SCANVI.load(model_dir, adata=adata)
+    if args.query_model_reference_h5ad:
+        print(f"[QUERY_MODEL_REFERENCE] {args.query_model_reference_h5ad}")
+        ref = sc.read_h5ad(args.query_model_reference_h5ad)
+        ref.obs_names = ref.obs_names.astype(str)
+        ref.obs_names_make_unique()
+        ref.var_names_make_unique()
+        ref_model = subset_reference_to_model_cells(ref, model_dir)
+        model = sca.models.SCANVI.load(model_dir, adata=ref_model)
+        sca.models.SCANVI.prepare_query_anndata(adata, model)
+        new_manager = model.adata_manager.transfer_fields(adata, extend_categories=True)
+        model._register_manager_for_instance(new_manager)
+    else:
+        model = sca.models.SCANVI.load(model_dir, adata=adata)
     model.module.eval()
     return model
+
+
+def model_run_outdir(model_dir: str) -> str:
+    return os.path.dirname(os.path.dirname(os.path.abspath(model_dir)))
+
+
+def subset_reference_to_model_cells(ref: sc.AnnData, model_dir: str) -> sc.AnnData:
+    obs_path = os.path.join(model_run_outdir(model_dir), "tables", "scanvi_full_obs_metadata.csv")
+    if not os.path.exists(obs_path):
+        print(f"[WARN] Model obs metadata not found; loading query model with full reference: {obs_path}")
+        return remove_unused_categories(ref.copy())
+
+    model_obs = pd.read_csv(obs_path, index_col=0, low_memory=False)
+    model_obs.index = model_obs.index.astype(str)
+    if "_split" in model_obs.columns:
+        model_obs = model_obs.loc[model_obs["_split"].astype(str).eq("Train")].copy()
+        print(f"[REF MODEL] loading model with Train split only: {len(model_obs):,} cells")
+    else:
+        print("[WARN] _split not found in model obs metadata; using all model metadata cells.")
+    available = set(ref.obs_names.astype(str))
+    keep = [name for name in model_obs.index.astype(str) if name in available]
+    if not keep:
+        raise ValueError(
+            "No overlap between model post-QC obs metadata and reference h5ad obs names:\n"
+            f"  {obs_path}"
+        )
+    out = ref[keep].copy()
+    out.obs_names_make_unique()
+    out.var_names_make_unique()
+    out = remove_unused_categories(out)
+    print(f"[REF MODEL] using {out.n_obs:,} post-QC model cells")
+    return out
+
+
+def remove_unused_categories(adata: sc.AnnData) -> sc.AnnData:
+    for col in adata.obs.columns:
+        if pd.api.types.is_categorical_dtype(adata.obs[col]):
+            adata.obs[col] = adata.obs[col].cat.remove_unused_categories()
+    return adata
 
 
 def detect_classifier_attr(model) -> str:

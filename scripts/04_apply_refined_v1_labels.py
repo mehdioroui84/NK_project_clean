@@ -20,7 +20,7 @@ from nk_project.io_utils import ensure_dirs
 GROUPBY = "leiden_0_4"
 OUTDIR_NAME = "refined_annotation_v1"
 POINT_SIZE = 0.06
-POINT_ALPHA = 0.65
+POINT_ALPHA = 0.52
 QC_POINT_SIZE = 0.08
 QC_POINT_ALPHA = 0.95
 
@@ -70,38 +70,6 @@ NK_EXCLUDED_SCORE_MARKERS = [
 ]
 
 
-# Collapsed full-data v1 labels. Leiden clusters are used as evidence; the
-# final labels intentionally merge related clusters to avoid over-fragmenting
-# the training target.
-REFINED_LABEL_BY_CLUSTER = {
-    "0": "Mature Cytotoxic",
-    "1": "Proliferative",
-    "2": "Mature Cytotoxic",
-    "3": "T",
-    "4": "Transitional Cytotoxic Tissue-Resident",
-    "5": "Cytokine-Stimulated CCR7+",
-    "6": "Lung Cytotoxic NK",
-    "7": "Unknown_Kidney",
-    "8": "T",
-    "9": "Transitional Cytotoxic",
-    "10": "Lung Cytotoxic NK",
-    "11": "Mature Cytotoxic",
-    "12": "Cytokine-Stimulated Cycling",
-    "13": "Transitional Cytotoxic Tissue-Resident",
-    "14": "Mature Cytotoxic TCF7+",
-    "15": "T",
-    "16": "B",
-    "17": "Mature Cytotoxic",
-    "18": "Regulatory",
-    "19": "B",
-    "20": "B",
-    "21": "Unknown_BM_1 Erythroid-like",
-    "22": "Myeloid-like",
-    "23": "Lung Cytotoxic NK",
-    "24": "Lung DOCK4+ SLC8A1+ NK",
-}
-
-
 def main():
     args = parse_args()
     in_path = os.path.join(cfg.BASE_OUTDIR, "leiden_discovery", "full_scvi_leiden.h5ad")
@@ -116,8 +84,13 @@ def main():
     if "X_umap" not in adata.obsm:
         raise KeyError("X_umap not found in full-data SCVI Leiden AnnData.")
 
-    label_mapping, label_source = load_label_mapping(args.mapping_csv, label_column=args.label_column)
-    apply_labels(adata, label_mapping, label_source=label_source)
+    expected_clusters = sorted(adata.obs[GROUPBY].astype(str).unique(), key=cluster_sort_key)
+    label_mapping, label_source, free_label_mapping = load_label_mapping(
+        args.mapping_csv,
+        label_column=args.label_column,
+        expected_clusters=expected_clusters,
+    )
+    apply_labels(adata, label_mapping, label_source=label_source, free_label_mapping=free_label_mapping)
     write_outputs(adata, outdir, label_mapping)
     plot_refined_umap(adata, figdir)
     plot_annotation_qc_umap(adata, figdir)
@@ -131,17 +104,15 @@ def main():
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Apply reviewed refined labels to full-data Leiden clusters. "
-            "By default uses the curated hardcoded v1 mapping; optionally accepts "
-            "a reviewed mapping CSV from the annotation agent."
+            "Apply annotation-agent labels to full-data Leiden clusters."
         )
     )
     parser.add_argument(
         "--mapping-csv",
-        default=None,
+        required=True,
         help=(
-            "Optional reviewed mapping CSV. Expected columns: leiden_0_4 and either "
-            "candidate_refined_label or NK_State_refined."
+            "Annotation mapping CSV. Expected columns: leiden_0_4 and final_structured_label "
+            "or another label column selected by --label-column."
         ),
     )
     parser.add_argument(
@@ -149,9 +120,8 @@ def parse_args():
         default=None,
         help=(
             "Column from --mapping-csv to use as the final SCANVI training label. "
-            "Useful choices for annotation-agent outputs: candidate_refined_label, "
-            "current_final_label, agent_preferred_label, or approved_label. "
-            "Default: auto-detect approved_label, NK_State_refined, candidate_refined_label, then refined_label."
+            "Default: final_structured_label. Use free_label only if you explicitly "
+            "want the model trained on the free biological names."
         ),
     )
     parser.add_argument(
@@ -188,11 +158,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_label_mapping(mapping_csv=None, *, label_column=None):
-    if mapping_csv is None:
-        print("[MAPPING] Using curated hardcoded refined-v1 mapping.")
-        return dict(REFINED_LABEL_BY_CLUSTER), "hardcoded_curated_mapping"
-
+def load_label_mapping(mapping_csv, *, label_column=None, expected_clusters=None):
     print(f"[MAPPING] Loading reviewed mapping CSV: {mapping_csv}")
     mapping = pd.read_csv(mapping_csv, dtype=str)
     if GROUPBY not in mapping.columns:
@@ -205,10 +171,9 @@ def load_label_mapping(mapping_csv=None, *, label_column=None):
     else:
         label_col = None
         for candidate in [
-            "approved_label",
+            "final_structured_label",
+            "free_label",
             cfg.REFINED_LABEL_KEY,
-            "candidate_refined_label",
-            "current_final_label",
             "refined_label",
         ]:
             if candidate in mapping.columns:
@@ -217,7 +182,7 @@ def load_label_mapping(mapping_csv=None, *, label_column=None):
     if label_col is None:
         raise KeyError(
             f"{mapping_csv} must contain one of: {cfg.REFINED_LABEL_KEY!r}, "
-            "'approved_label', 'candidate_refined_label', 'current_final_label', or 'refined_label'."
+            "'final_structured_label', 'free_label', or 'refined_label'."
         )
     print(f"[MAPPING_LABEL_COLUMN] {label_col}")
 
@@ -226,22 +191,30 @@ def load_label_mapping(mapping_csv=None, *, label_column=None):
         bad = mapping.loc[labels.eq(""), GROUPBY].astype(str).tolist()
         raise ValueError(f"Mapping CSV has empty labels in {label_col!r} for clusters: {bad}")
     out = dict(zip(mapping[GROUPBY].astype(str), labels))
-    missing = sorted(set(REFINED_LABEL_BY_CLUSTER) - set(out), key=cluster_sort_key)
+    expected = set(expected_clusters or [])
+    missing = sorted(expected - set(out), key=cluster_sort_key)
     if missing:
         raise ValueError(f"Mapping CSV is missing {GROUPBY} clusters: {missing}")
-    return out, label_col
+    free_label_mapping = {}
+    if "free_label" in mapping.columns:
+        free_labels = mapping["free_label"].fillna("").astype(str).str.strip()
+        free_label_mapping = dict(zip(mapping[GROUPBY].astype(str), free_labels))
+    return out, label_col, free_label_mapping
 
 
-def apply_labels(adata, label_mapping, *, label_source):
+def apply_labels(adata, label_mapping, *, label_source, free_label_mapping=None):
     clusters = adata.obs[GROUPBY].astype(str)
     labels = clusters.map(label_mapping)
     if labels.isna().any():
         missing = sorted(clusters[labels.isna()].unique(), key=cluster_sort_key)
         raise ValueError(f"Missing refined labels for {GROUPBY} clusters: {missing}")
 
-    adata.obs["NK_State_original"] = adata.obs[cfg.LABEL_KEY].astype(str)
     adata.obs[cfg.REFINED_LABEL_KEY] = labels.astype("category")
     adata.obs["NK_State_refined_v1_source"] = f"full_data_leiden_0_4_mapping:{label_source}"
+    if free_label_mapping:
+        free_labels = clusters.map(free_label_mapping)
+        if not free_labels.isna().any():
+            adata.obs["NK_State_free_label"] = free_labels.astype("category")
 
     print("\n[REFINED LABEL COUNTS]")
     print(adata.obs[cfg.REFINED_LABEL_KEY].astype(str).value_counts().to_string())
@@ -287,13 +260,12 @@ def write_outputs(adata, outdir, label_mapping):
 def plot_refined_umap(adata, figdir):
     xy = adata.obsm["X_umap"]
     panels = [
-        (GROUPBY, f"1.1 full {GROUPBY} clusters", False, True),
-        (cfg.LABEL_KEY, f"1.2 original annotation: {cfg.LABEL_KEY}", True, False),
-        (cfg.REFINED_LABEL_KEY, f"1.3 refined v1 annotation: {cfg.REFINED_LABEL_KEY}", True, False),
+        (GROUPBY, f"1. Leiden {GROUPBY}", False, True),
+        (cfg.REFINED_LABEL_KEY, f"2. final annotation: {cfg.REFINED_LABEL_KEY}", True, False),
     ]
 
-    fig, axes = plt.subplots(1, 3, figsize=(22, 7))
-    fig.suptitle("Full-data SCVI latent space: refined annotation v1", fontsize=15)
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    fig.suptitle("Full-data SCVI latent space: annotation labels", fontsize=15)
     for ax, (obs_key, title, show_legend, annotate) in zip(axes, panels):
         scatter_categorical(
             ax,
@@ -362,14 +334,13 @@ def get_umap3d(adata, args, outdir):
 
 def plot_refined_umap_3d(adata, figdir, xyz):
     panels = [
-        (GROUPBY, f"1.1 3D {GROUPBY} clusters", False, True),
-        (cfg.LABEL_KEY, f"1.2 original annotation: {cfg.LABEL_KEY}", True, False),
-        (cfg.REFINED_LABEL_KEY, f"1.3 refined v1 annotation: {cfg.REFINED_LABEL_KEY}", True, False),
+        (GROUPBY, f"1. 3D {GROUPBY}", False, True),
+        (cfg.REFINED_LABEL_KEY, f"2. final annotation: {cfg.REFINED_LABEL_KEY}", True, False),
     ]
 
-    fig = plt.figure(figsize=(22, 7))
-    fig.suptitle("Full-data SCVI latent space: refined annotation v1, 3D UMAP", fontsize=15)
-    axes = [fig.add_subplot(1, 3, idx + 1, projection="3d") for idx in range(3)]
+    fig = plt.figure(figsize=(16, 7))
+    fig.suptitle("Full-data SCVI latent space: annotation labels, 3D UMAP", fontsize=15)
+    axes = [fig.add_subplot(1, 2, idx + 1, projection="3d") for idx in range(2)]
     for ax, (obs_key, title, show_legend, annotate) in zip(axes, panels):
         scatter_categorical_3d(
             ax,
@@ -391,8 +362,6 @@ def plot_annotation_qc_umap(adata, figdir):
     xy = adata.obsm["X_umap"]
     positive_score, positive_used, positive_missing = marker_mean_score(adata, PAN_NK_SCORE_MARKERS)
     excluded_score, excluded_used, excluded_missing = marker_mean_score(adata, NK_EXCLUDED_SCORE_MARKERS)
-    original_label_key = "NK_State_original" if "NK_State_original" in adata.obs else cfg.LABEL_KEY
-    original_label = obs_values(adata, original_label_key)
     tissue = obs_values(adata, "tissue")
     dataset = obs_values(adata, cfg.DATASET_KEY)
     assay = obs_values(adata, cfg.ASSAY_CLEAN_KEY)
@@ -435,68 +404,61 @@ def plot_annotation_qc_umap(adata, figdir):
     scatter_categorical(
         axes[1],
         xy,
-        original_label,
-        f"2. Yuntao/original annotation: {original_label_key}",
+        adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values,
+        f"2. final annotation: {cfg.REFINED_LABEL_KEY}",
         show_legend=True,
         annotate_clusters=False,
     )
     scatter_categorical(
         axes[2],
         xy,
-        adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values,
-        f"3. final annotation: {cfg.REFINED_LABEL_KEY}",
+        tissue,
+        "3. Tissue",
         show_legend=True,
         annotate_clusters=False,
     )
     scatter_categorical(
         axes[3],
         xy,
-        tissue,
-        "4. Tissue",
-        show_legend=True,
+        dataset,
+        "4. Dataset ID",
+        show_legend=False,
         annotate_clusters=False,
     )
     scatter_categorical(
         axes[4],
         xy,
-        dataset,
-        "5. Dataset ID",
-        show_legend=False,
-        annotate_clusters=False,
-    )
-    scatter_categorical(
-        axes[5],
-        xy,
         assay,
-        "6. Assay clean",
+        "5. Assay clean",
         show_legend=True,
         annotate_clusters=False,
+    )
+    scatter_continuous(
+        axes[5],
+        xy,
+        signed_score,
+        "6. signed NK identity score (red=NK-like, blue=NK-excluded)",
+        cmap="RdBu_r",
+        symmetric=True,
+        robust=True,
     )
     scatter_continuous(
         axes[6],
         xy,
         positive_score,
-        f"7. positive NK score (Reds; {len(positive_used)}/{len(PAN_NK_SCORE_MARKERS)} genes)",
+        f"7. positive NK score (standardized; Reds; {len(positive_used)}/{len(PAN_NK_SCORE_MARKERS)} genes)",
         cmap="Reds",
         robust=True,
     )
     scatter_continuous(
         axes[7],
         xy,
-        signed_score,
-        "8. signed NK identity score (red=NK-like, blue=NK-excluded)",
-        cmap="RdBu_r",
-        symmetric=True,
-        robust=True,
-    )
-    scatter_continuous(
-        axes[8],
-        xy,
         excluded_score,
-        f"9. NK-excluded score (Blues; {len(excluded_used)}/{len(NK_EXCLUDED_SCORE_MARKERS)} genes)",
+        f"8. NK-excluded score (standardized; Blues; {len(excluded_used)}/{len(NK_EXCLUDED_SCORE_MARKERS)} genes)",
         cmap="Blues",
         robust=True,
     )
+    plot_cluster_marker_agreement(axes[8], adata, positive_score, excluded_score)
 
     plt.tight_layout()
     png = os.path.join(figdir, "annotation_umap_review_panels.png")
@@ -508,8 +470,6 @@ def plot_annotation_qc_umap(adata, figdir):
 def plot_annotation_qc_umap_3d(adata, figdir, xyz):
     positive_score, positive_used, _ = marker_mean_score(adata, PAN_NK_SCORE_MARKERS)
     excluded_score, excluded_used, _ = marker_mean_score(adata, NK_EXCLUDED_SCORE_MARKERS)
-    original_label_key = "NK_State_original" if "NK_State_original" in adata.obs else cfg.LABEL_KEY
-    original_label = obs_values(adata, original_label_key)
     tissue = obs_values(adata, "tissue")
     dataset = obs_values(adata, cfg.DATASET_KEY)
     assay = obs_values(adata, cfg.ASSAY_CLEAN_KEY)
@@ -517,7 +477,8 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
 
     fig = plt.figure(figsize=(24, 22))
     fig.suptitle("Annotation QC: 3D UMAP labels, metadata, and NK marker scores", fontsize=15)
-    axes = [fig.add_subplot(3, 3, idx + 1, projection="3d") for idx in range(9)]
+    axes = [fig.add_subplot(3, 3, idx + 1, projection="3d") for idx in range(8)]
+    axes.append(fig.add_subplot(3, 3, 9))
 
     scatter_categorical_3d(
         axes[0],
@@ -530,47 +491,40 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
     scatter_categorical_3d(
         axes[1],
         xyz,
-        original_label,
-        f"2. Yuntao/original annotation: {original_label_key}",
-        show_legend=True,
-        annotate_clusters=False,
-    )
-    scatter_categorical_3d(
-        axes[2],
-        xyz,
         adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values,
-        f"3. final annotation: {cfg.REFINED_LABEL_KEY}",
+        f"2. final annotation: {cfg.REFINED_LABEL_KEY}",
         show_legend=True,
         annotate_clusters=False,
     )
-    scatter_categorical_3d(axes[3], xyz, tissue, "4. Tissue", show_legend=True, annotate_clusters=False)
-    scatter_categorical_3d(axes[4], xyz, dataset, "5. Dataset ID", show_legend=False, annotate_clusters=False)
-    scatter_categorical_3d(axes[5], xyz, assay, "6. Assay clean", show_legend=True, annotate_clusters=False)
+    scatter_categorical_3d(axes[2], xyz, tissue, "3. Tissue", show_legend=True, annotate_clusters=False)
+    scatter_categorical_3d(axes[3], xyz, dataset, "4. Dataset ID", show_legend=False, annotate_clusters=False)
+    scatter_categorical_3d(axes[4], xyz, assay, "5. Assay clean", show_legend=True, annotate_clusters=False)
+    scatter_continuous_3d(
+        axes[5],
+        xyz,
+        signed_score,
+        "6. signed NK identity score (red=NK-like, blue=NK-excluded)",
+        cmap="RdBu_r",
+        symmetric=True,
+        robust=True,
+    )
     scatter_continuous_3d(
         axes[6],
         xyz,
         positive_score,
-        f"7. positive NK score (Reds; {len(positive_used)}/{len(PAN_NK_SCORE_MARKERS)} genes)",
+        f"7. positive NK score (standardized; Reds; {len(positive_used)}/{len(PAN_NK_SCORE_MARKERS)} genes)",
         cmap="Reds",
         robust=True,
     )
     scatter_continuous_3d(
         axes[7],
         xyz,
-        signed_score,
-        "8. signed NK identity score (red=NK-like, blue=NK-excluded)",
-        cmap="RdBu_r",
-        symmetric=True,
-        robust=True,
-    )
-    scatter_continuous_3d(
-        axes[8],
-        xyz,
         excluded_score,
-        f"9. NK-excluded score (Blues; {len(excluded_used)}/{len(NK_EXCLUDED_SCORE_MARKERS)} genes)",
+        f"8. NK-excluded score (standardized; Blues; {len(excluded_used)}/{len(NK_EXCLUDED_SCORE_MARKERS)} genes)",
         cmap="Blues",
         robust=True,
     )
+    plot_cluster_marker_agreement(axes[8], adata, positive_score, excluded_score)
 
     plt.tight_layout()
     png = os.path.join(figdir, "annotation_umap_review_panels_3d.png")
@@ -610,6 +564,80 @@ def zscore(values):
     if not np.isfinite(std) or std == 0:
         return np.zeros_like(values, dtype=float)
     return (values - mean) / std
+
+
+def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score):
+    obs = pd.DataFrame(
+        {
+            GROUPBY: adata.obs[GROUPBY].astype(str).values,
+            "label": adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values,
+            "positive_score": np.asarray(positive_score, dtype=float),
+            "excluded_score": np.asarray(excluded_score, dtype=float),
+        }
+    )
+    cluster = (
+        obs.groupby(GROUPBY, sort=False)
+        .agg(
+            label=("label", lambda x: x.value_counts().idxmax()),
+            positive_score=("positive_score", "mean"),
+            excluded_score=("excluded_score", "mean"),
+            n_cells=("label", "size"),
+        )
+        .reset_index()
+    )
+    cluster = cluster.sort_values(GROUPBY, key=lambda s: s.map(cluster_sort_key))
+    colors = category_colors(cluster["label"].tolist())
+    sizes = 28 + 120 * np.sqrt(cluster["n_cells"] / cluster["n_cells"].max())
+
+    for _, row in cluster.iterrows():
+        ax.scatter(
+            row["positive_score"],
+            row["excluded_score"],
+            s=float(sizes.loc[row.name]) if hasattr(sizes, "loc") else 80,
+            color=colors[row["label"]],
+            alpha=0.82,
+            edgecolors="white",
+            linewidths=0.35,
+        )
+        ax.text(
+            row["positive_score"],
+            row["excluded_score"],
+            str(row[GROUPBY]),
+            ha="center",
+            va="center",
+            fontsize=6,
+            color="#222222",
+            weight="bold",
+        )
+
+    ax.axvline(0, color="#bbbbbb", linewidth=0.8, zorder=0)
+    ax.axhline(0, color="#bbbbbb", linewidth=0.8, zorder=0)
+    ax.grid(True, color="#e2e2e2", linewidth=0.6, alpha=0.8)
+    ax.set_title("9. Cluster-level NK vs exclusion marker scores")
+    ax.set_xlabel("Mean standardized positive NK score")
+    ax.set_ylabel("Mean standardized NK-excluded score")
+    set_padded_limits(ax, cluster["positive_score"], axis="x")
+    set_padded_limits(ax, cluster["excluded_score"], axis="y")
+    ax.tick_params(labelsize=7)
+
+
+def set_padded_limits(ax, values, *, axis: str):
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        limits = (-1.0, 1.0)
+    else:
+        vmin = float(np.nanmin(values))
+        vmax = float(np.nanmax(values))
+        span = max(vmax - vmin, 0.05)
+        pad = 0.12 * span
+        limits = (vmin - pad, vmax + pad)
+        if limits[0] == limits[1]:
+            limits = (limits[0] - 0.05, limits[1] + 0.05)
+    if axis == "x":
+        ax.set_xlim(*limits)
+    else:
+        ax.set_ylim(*limits)
 
 
 def scatter_continuous(
@@ -922,6 +950,16 @@ def cluster_sort_key(value):
 
 def category_colors(categories):
     preferred = {
+        "blood": "#D62728",
+        "cord blood": "#FF7F00",
+        "bone marrow": "#9467BD",
+        "lung": "#56B4E9",
+        "liver": "#8C564B",
+        "kidney": "#2CA02C",
+        "spleen": "#D33682",
+        "lymph node": "#F0E442",
+        "thymus": "#BCBD22",
+        "decidua": "#E377C2",
         "B": "#1f77b4",
         "T": "#d62728",
         "Cytokine-Stimulated": "#E7298A",
@@ -951,19 +989,23 @@ def category_colors(categories):
         "L6_Developmental_immature": "#E7298A",
         "NK1_Chemokine_inflammatory": "#0072B2",
         "NK1_Cytotoxic_activated": "#D55E00",
-        "NK2_Chemokine_inflammatory": "#CC79A7",
+        "NK1_Checkpoint_exhausted": "#7570B3",
+        "NK1_Proliferating": "#80B1D3",
+        "NK2_Chemokine_inflammatory": "#33A02C",
         "NK2_CIMP_cytokine_primed_memory_like": "#F0E442",
-        "NK2_Checkpoint_exhausted": "#33A02C",
+        "NK2_Checkpoint_exhausted": "#CC79A7",
         "NK2_Cytotoxic_activated": "#009E73",
+        "NK2_ER_stress_UPR": "#8DD3C7",
+        "NK2_Homeostatic_quiescent": "#B2DF8A",
         "NK2_Proliferating": "#56B4E9",
         "cNK_Cytotoxic_activated": "#8C2D04",
-        "cNK_Metabolic_stress_hypoxia": "#80CDC1",
+        "cNK_Metabolic_stress_hypoxia": "#00A6D6",
         "cNK_Homeostatic_quiescent": "#A65628",
-        "cNK_Proliferating": "#00A6D6",
+        "cNK_Proliferating": "#CAB2D6",
         "cNK_ER_stress_UPR": "#7B3294",
         "trNK_Chemokine_inflammatory": "#A6761D",
         "trNK_Homeostatic_quiescent": "#FF7F00",
-        "Non-NK": "#6A3D9A",
+        "Non-NK": "#8A8A8A",
         "Unsure_Chemokine_inflammatory": "#E6AB02",
         "Unsure_Homeostatic_quiescent": "#8DA0CB",
         "Unsure_Proliferating": "#FB8072",

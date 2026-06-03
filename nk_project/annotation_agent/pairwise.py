@@ -12,31 +12,6 @@ import pandas as pd
 PAIRWISE_TOP_N = 100
 
 
-def recommended_pairs_from_results(
-    results: list[dict[str, Any]],
-    valid_cluster_ids: set[str],
-    *,
-    max_pairs: int | None = None,
-) -> list[tuple[str, str]]:
-    pairs: list[tuple[str, str]] = []
-    seen = set()
-    for result in results:
-        cluster_id = str(result["cluster_id"])
-        recs = result["final_decision"].get("recommended_pairwise_comparisons", [])
-        for rec in recs:
-            for other_id in extract_cluster_ids(str(rec), valid_cluster_ids):
-                if other_id == cluster_id:
-                    continue
-                pair = tuple(sorted((cluster_id, other_id), key=cluster_sort_key))
-                if pair in seen:
-                    continue
-                seen.add(pair)
-                pairs.append(pair)
-                if max_pairs is not None and len(pairs) >= max_pairs:
-                    return pairs
-    return pairs
-
-
 def centroid_distance_table(
     *,
     input_h5ad: str,
@@ -121,10 +96,9 @@ def same_label_distance_pairs_from_results(
         cluster_id = str(result["cluster_id"])
         final = result.get("final_decision", {})
         label = structured_label_from_final(final)
-        suggested = str(final.get("suggested_new_label", "")).strip()
         if label:
             label_by_cluster[cluster_id] = label
-            suggested_by_cluster[cluster_id] = suggested
+            suggested_by_cluster[cluster_id] = str(final.get("free_label", "")).strip()
 
     candidate_rows = []
     for _, row in distance_table.iterrows():
@@ -143,11 +117,11 @@ def same_label_distance_pairs_from_results(
             {
                 "cluster_a": cluster_a,
                 "cluster_b": cluster_b,
-                "candidate_label": label_a,
+                "final_structured_label": label_a,
                 "centroid_distance": distance,
                 "latent_key": row.get("latent_key"),
-                "suggested_new_label_a": suggested_by_cluster.get(cluster_a, ""),
-                "suggested_new_label_b": suggested_by_cluster.get(cluster_b, ""),
+                "free_label_a": suggested_by_cluster.get(cluster_a, ""),
+                "free_label_b": suggested_by_cluster.get(cluster_b, ""),
             }
         )
 
@@ -208,8 +182,8 @@ def cluster_distance_evidence_from_results(
         cluster_id = str(result["cluster_id"])
         final = result.get("final_decision", {})
         label_by_cluster[cluster_id] = structured_label_from_final(final)
-        novelty_by_cluster[cluster_id] = bool(final.get("possible_novel_subtype", False))
-        novelty_reason_by_cluster[cluster_id] = str(final.get("novel_subtype_reason", "")).strip()
+        novelty_by_cluster[cluster_id] = bool(final.get("needs_human_review", False))
+        novelty_reason_by_cluster[cluster_id] = str(final.get("human_review_reason", "")).strip()
 
     distance_table = distance_table.copy()
     distance_table["cluster_a"] = distance_table["cluster_a"].astype(str)
@@ -286,7 +260,6 @@ def cluster_distance_evidence_from_results(
         rows.append(
             {
                 "cluster_id": cluster_id,
-                "candidate_refined_label": label_by_cluster[cluster_id],
                 "final_structured_label": label_by_cluster[cluster_id],
                 "nearest_cluster": str(nearest["other_cluster"]),
                 "nearest_label": str(nearest["other_label"]),
@@ -313,9 +286,8 @@ def cluster_distance_evidence_from_results(
                     nearest_distance=nearest_nk_distance,
                     isolation_percentile=isolation_percentile,
                 ),
-                "possible_novel_subtype": novelty_by_cluster.get(cluster_id, False),
-                "novel_subtype_score_0_5": novelty_score,
-                "novel_subtype_reason": novelty_reason_by_cluster.get(cluster_id, ""),
+                "distance_review_score_0_5": novelty_score,
+                "human_review_reason": novelty_reason_by_cluster.get(cluster_id, ""),
             }
         )
     return pd.DataFrame(rows)
@@ -355,11 +327,7 @@ def novelty_reason(
 
 
 def structured_label_from_final(final: dict[str, Any]) -> str:
-    for key in ["final_structured_label", "agent_preferred_label", "candidate_label"]:
-        value = str(final.get(key, "")).strip()
-        if value:
-            return value
-    return "Unsure"
+    return str(final.get("final_structured_label", "")).strip() or "Non-NK"
 
 
 def is_nk_structured_label(label: Any) -> bool:
