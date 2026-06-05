@@ -48,6 +48,50 @@ Return valid JSON only. No markdown.
 """
 
 
+MACHINE_REVIEW_SYSTEM_PROMPT = """You review one cluster after first-pass agent annotation.
+
+Use only the provided first-pass agent structured/free label, first-pass agent
+rationale, metadata context, and cluster-specific marker evidence.
+Do not use or assume any external or prior human annotation.
+
+Goal:
+- Find discrepancies between the first-pass agent label and marker evidence.
+- Produce a reviewed structured label and concise reviewed free label for
+  downstream use.
+
+Rules:
+- Marker/DE evidence and lineage consistency should drive the reviewed label.
+- reviewed_structured_label must be one allowed structured NK label or Non-NK.
+- The background is mostly NK/NK-enriched. Negative pan-NK DE means lower than
+  other NK clusters, not necessarily absent NK identity. Do not revise an NK
+  first-pass call to Non-NK based only on relatively low GNLY, GZMB, PRF1, NKG7,
+  or KLRF1 in cluster-vs-rest DE.
+- If strong non-NK lineage markers support another lineage and pan-NK support is
+  weak or depleted, revise to Non-NK.
+- T and NK programs can overlap. Do not call T/Non-NK based only on activation,
+  proliferation, cytokine, chemokine, stress, CCR7, IL2RA, IRF4, GZMK, or IFNG
+  signals. Require coherent core non-NK lineage evidence plus weak/depleted
+-  pan-NK support. If evidence is mixed, keep the best first-pass NK label and
+  flag review.
+- If the free label/rationale and markers clearly contradict the structured
+  label, revise the label.
+- If the evidence is mixed but still biologically plausible, keep the best
+  concise label and set needs_human_review=true.
+- reviewed_label_short must be concise: ideally fewer than 4 underscores
+  and fewer than 40 characters.
+- When shortening labels, preserve the most informative biology token when
+  useful, such as subtype/state, contamination lineage, key marker,
+  tissue/context, stress, or proliferation.
+- Style examples:
+  NK1_cytotoxic_activated_possible_myeloid_contamination -> NK1_Cytotoxic_contam_myeloid
+  NK1_Cytotoxic_activated_FGFBP2+_GZMH+_blood -> NK1_Cytotoxic_activated_FGFBP2+_blood
+  CD3+_T_cells_with_IFNG_GZMK_inflammatory_and_ER_stress_signature -> T_inflammatory_stress
+- reviewed_label_detail can explain the biology in one short phrase.
+- Do not add an NK_ prefix.
+- Return valid JSON only. No markdown.
+"""
+
+
 def build_cluster_prompt(
     evidence: dict[str, Any],
     previous_decisions: list[dict[str, Any]],
@@ -121,6 +165,35 @@ def build_pairwise_split_prompt(
             "cluster_b_free_label_reason": "pairwise-DE-based reason",
             "needs_human_review": "boolean",
             "human_review_reason": "short reason if review is needed",
+        },
+    }
+    return json.dumps(payload, indent=2)
+
+
+def build_machine_review_prompt(cluster_report: dict[str, Any]) -> str:
+    allowed_subtypes = [label for label in allowed_nk_subtype_labels() if label != "Unsure"]
+    allowed_states = [label for label in allowed_nk_state_labels() if label not in {"Unsure", "Non-NK", "NA"}]
+    allowed_structured = ["Non-NK"] + [
+        f"{subtype}_{state}"
+        for subtype in allowed_subtypes
+        if subtype != "Non-NK"
+        for state in allowed_states
+    ]
+    payload = {
+        "task": "Review one first-pass agent cluster label for consistency and concise downstream use.",
+        "allowed_reviewed_structured_labels": allowed_structured,
+        "cluster_report": cluster_report,
+        "required_json_schema": {
+            "cluster_id": "string",
+            "review_decision": "keep, revise, or flag_only",
+            "reviewed_structured_label": "one allowed reviewed structured label or Non-NK",
+            "reviewed_label_short": "concise final label, ideally fewer than 4 underscores and fewer than 40 characters",
+            "reviewed_label_detail": "one short phrase explaining the reviewed label",
+            "discrepancy_flags": ["short strings such as structured_free_mismatch, marker_label_mismatch, possible_contamination"],
+            "review_reason": "brief reason citing first-pass label/rationale, marker evidence, and metadata context",
+            "confidence_score": "integer 0-5",
+            "needs_human_review": "boolean",
+            "human_review_reason": "short reason if review is needed, otherwise empty string",
         },
     }
     return json.dumps(payload, indent=2)

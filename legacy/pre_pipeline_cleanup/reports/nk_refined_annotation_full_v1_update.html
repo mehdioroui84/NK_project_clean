@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NK refined annotation v1 update</title>
+  <style>
+    :root {
+      --ink: #16202c;
+      --muted: #5e6a77;
+      --line: #d8e0ea;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --blue: #1f6feb;
+      --green: #1b8a4b;
+      --orange: #c45a2c;
+      --purple: #6f42c1;
+      --cyan: #087990;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .deck {
+      max-width: 1760px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    .slide {
+      min-height: 910px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 24px;
+      padding: 34px 40px 34px;
+      box-shadow: 0 10px 28px rgba(24, 38, 54, 0.08);
+      page-break-after: always;
+      position: relative;
+      overflow: hidden;
+    }
+    .slide::after {
+      content: attr(data-slide);
+      position: absolute;
+      right: 26px;
+      bottom: 16px;
+      color: #98a5b3;
+      font-size: 13px;
+    }
+    .eyebrow {
+      color: var(--blue);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 {
+      font-size: 52px;
+      line-height: 1.02;
+      letter-spacing: 0;
+      margin-bottom: 18px;
+      max-width: 1280px;
+    }
+    h2 {
+      font-size: 36px;
+      line-height: 1.12;
+      letter-spacing: 0;
+      margin-bottom: 18px;
+      max-width: 1450px;
+    }
+    h3 {
+      font-size: 22px;
+      line-height: 1.18;
+      margin-bottom: 10px;
+    }
+    p, li {
+      font-size: 19px;
+      line-height: 1.36;
+    }
+    ul { margin: 0; padding-left: 22px; }
+    li { margin-bottom: 10px; }
+    .subtitle {
+      color: var(--muted);
+      font-size: 24px;
+      line-height: 1.28;
+      max-width: 1050px;
+    }
+    .takeaway {
+      border-left: 5px solid var(--blue);
+      background: #edf5ff;
+      padding: 15px 19px;
+      font-size: 21px;
+      line-height: 1.30;
+      font-weight: 800;
+      margin-top: 18px;
+    }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 0.72fr 1.28fr;
+      gap: 26px;
+      align-items: center;
+    }
+    .grid2.reverse {
+      grid-template-columns: 1.34fr 0.66fr;
+    }
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 13px;
+      margin-top: 30px;
+    }
+    .step, .panel, .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 18px;
+    }
+    .step { min-height: 165px; }
+    .step .num {
+      color: var(--blue);
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+    .step .title {
+      font-size: 19px;
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    .step .copy {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.28;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .metric {
+      border-top: 5px solid var(--blue);
+      min-height: 115px;
+    }
+    .metric .value {
+      font-size: 36px;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .metric .label {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.25;
+    }
+    .figure {
+      display: block;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      object-fit: contain;
+    }
+    .figure.clean { border: 0; border-radius: 0; }
+    .figure.large { max-height: 705px; }
+    .figure.medium { max-height: 595px; }
+    .figure.short { max-height: 470px; }
+    .caption {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.28;
+      margin-top: 8px;
+    }
+    .tagrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0 0;
+    }
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 7px 11px;
+      background: #eef4ff;
+      color: #164d9c;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tag.green { background: #eaf8ef; color: #17643a; }
+    .tag.orange { background: #fff2e8; color: #91400f; }
+    .tag.purple { background: #f1ecff; color: #5634a1; }
+    .tag.gray { background: #eef1f4; color: #46515c; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 16px;
+      background: white;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .barlist {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .barrow {
+      display: grid;
+      grid-template-columns: 250px 1fr 80px;
+      gap: 12px;
+      align-items: center;
+      font-size: 16px;
+    }
+    .barbg {
+      height: 14px;
+      background: #e7edf5;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .barfill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+    .note {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.32;
+    }
+    .bigquote {
+      font-size: 34px;
+      line-height: 1.2;
+      font-weight: 900;
+      max-width: 1280px;
+      margin: 80px auto 30px;
+      text-align: center;
+    }
+    .center { text-align: center; }
+    @media print {
+      body { background: white; }
+      .deck { max-width: none; padding: 0; }
+      .slide {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        margin: 0;
+        min-height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+<main class="deck">
+
+  <section class="slide" data-slide="1">
+    <div class="eyebrow">NK Reference Update</div>
+    <h1>Refined NK annotation v1 from full-data SCVI structure</h1>
+    <p class="subtitle">
+      We used the SCVI latent space to turn broad manual labels into a cleaner training target,
+      then retrained SCANVI and evaluated both validation and zero-shot held-out performance.
+    </p>
+    <div class="metrics">
+      <div class="metric"><div class="value">326k</div><div class="label">cells in the full SCVI Leiden discovery object</div></div>
+      <div class="metric"><div class="value">0.4</div><div class="label">Leiden resolution selected for full-data reannotation</div></div>
+      <div class="metric"><div class="value">15</div><div class="label">collapsed refined v1 labels used for SCANVI training</div></div>
+      <div class="metric"><div class="value">0.969</div><div class="label">validation macro F1 after retraining refined SCANVI</div></div>
+    </div>
+    <div class="flow">
+      <div class="step"><div class="num">01</div><div class="title">Initial discovery</div><div class="copy">Started with subsampled validation clustering to understand structure without overloading the workflow.</div></div>
+      <div class="step"><div class="num">02</div><div class="title">Full-data clustering</div><div class="copy">Reran Leiden on all SCVI latent cells at 0.2, 0.3, and 0.4.</div></div>
+      <div class="step"><div class="num">03</div><div class="title">Resolution choice</div><div class="copy">Chose 0.4 because it preserved the biologically useful splits without committing to 25 final labels.</div></div>
+      <div class="step"><div class="num">04</div><div class="title">Collapsed labels</div><div class="copy">Mapped the 25 clusters into 15 practical refined labels.</div></div>
+      <div class="step"><div class="num">05</div><div class="title">Model check</div><div class="copy">Retrained SCANVI on the refined labels and evaluated validation, full-data, and zero-shot performance.</div></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="2">
+    <div class="eyebrow">Resolution Selection</div>
+    <h2>We compared full-data Leiden resolutions and selected 0.4 as the working resolution</h2>
+    <div class="grid2">
+      <div>
+        <table>
+          <thead><tr><th>Resolution</th><th>Clusters</th><th>Smallest cluster</th><th>Largest cluster</th></tr></thead>
+          <tbody>
+            <tr><td>0.2</td><td>16</td><td>831</td><td>108,033</td></tr>
+            <tr><td>0.3</td><td>21</td><td>273</td><td>101,069</td></tr>
+            <tr><td><strong>0.4</strong></td><td><strong>25</strong></td><td><strong>929</strong></td><td><strong>49,483</strong></td></tr>
+          </tbody>
+        </table>
+        <div class="takeaway">
+          0.4 gave enough resolution to separate cytokine-stimulated, tissue-resident, lung, and proliferative structure. We used the clusters as evidence, then collapsed them into a manageable label set.
+        </div>
+        <ul>
+          <li>0.2 was too coarse and merged states we wanted to inspect.</li>
+          <li>0.3 improved structure but still collapsed several relevant populations.</li>
+          <li>0.4 increased the cluster count, but the added splits were interpretable and useful for reannotation.</li>
+        </ul>
+      </div>
+      <div>
+        <img class="figure large" src="../outputs/leiden_discovery/figures/full_leiden_resolution_overview.png" />
+        <div class="caption">Full-data SCVI latent space shown across Leiden 0.2, 0.3, and 0.4.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="3">
+    <div class="eyebrow">Reannotation Strategy</div>
+    <h2>The 25 Leiden clusters were not treated as 25 final cell states</h2>
+    <div class="grid2 reverse">
+      <div>
+        <img class="figure large" src="../outputs/refined_annotation_v1/figures/full_refined_v1_umap.png" />
+        <div class="caption">Full-data Leiden clusters, original annotation, and collapsed refined v1 labels.</div>
+      </div>
+      <div>
+        <h3>Practical rule</h3>
+        <p>We kept the label set broad enough for SCANVI training, but preserved splits where clustering, marker programs, and prior annotation agreed.</p>
+        <div class="tagrow">
+          <span class="tag green">Merged mature cytotoxic clusters</span>
+          <span class="tag">Split cytokine-stimulated cells</span>
+          <span class="tag purple">Kept tissue-resident transitional NK</span>
+          <span class="tag orange">Simplified lung NK structure</span>
+          <span class="tag gray">B and T kept as references</span>
+        </div>
+        <div class="takeaway">
+          The output is a v1 training annotation, not an overfit cluster naming exercise.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="4">
+    <div class="eyebrow">Refined Label Set</div>
+    <h2>Refined v1 uses 15 labels, with most cells concentrated in the major NK and reference states</h2>
+    <div class="grid2">
+      <div>
+        <div class="barlist">
+          <div class="barrow"><div>Mature Cytotoxic</div><div class="barbg"><div class="barfill" style="width:100%"></div></div><div>105,989</div></div>
+          <div class="barrow"><div>Lung Cytotoxic NK</div><div class="barbg"><div class="barfill" style="width:49%"></div></div><div>52,028</div></div>
+          <div class="barrow"><div>T</div><div class="barbg"><div class="barfill" style="width:38%"></div></div><div>39,815</div></div>
+          <div class="barrow"><div>Tissue-resident transitional</div><div class="barbg"><div class="barfill" style="width:27%"></div></div><div>29,049</div></div>
+          <div class="barrow"><div>Transitional Cytotoxic</div><div class="barbg"><div class="barfill" style="width:23%"></div></div><div>24,357</div></div>
+          <div class="barrow"><div>B</div><div class="barbg"><div class="barfill" style="width:17%"></div></div><div>17,821</div></div>
+          <div class="barrow"><div>Cytokine-stim proliferative</div><div class="barbg"><div class="barfill" style="width:15%"></div></div><div>15,756</div></div>
+          <div class="barrow"><div>Cytokine-stim CCR7+</div><div class="barbg"><div class="barfill" style="width:9%"></div></div><div>10,058</div></div>
+          <div class="barrow"><div>Other refined states</div><div class="barbg"><div class="barfill" style="width:32%; background: var(--purple)"></div></div><div>33,325</div></div>
+        </div>
+      </div>
+      <div>
+        <h3>How the final labels were used</h3>
+        <ul>
+          <li>B and T were retained as simple reference labels to help SCANVI learn non-NK immune structure.</li>
+          <li>Mature cytotoxic clusters were merged unless a stable marker-supported branch was useful.</li>
+          <li>Cytokine-stimulated cells were split into CCR7+ and proliferative programs.</li>
+          <li>Small non-NK-like populations were kept broad rather than overnamed.</li>
+        </ul>
+        <div class="takeaway">This gives a compact annotation that is still more informative than the original broad labels.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="5">
+    <div class="eyebrow">Refined SCANVI</div>
+    <h2>Retraining SCANVI on refined v1 labels produced a stable validation result</h2>
+    <div class="metrics">
+      <div class="metric"><div class="value">0.969</div><div class="label">validation macro F1</div></div>
+      <div class="metric"><div class="value">0.969</div><div class="label">validation weighted F1</div></div>
+      <div class="metric"><div class="value">0.981</div><div class="label">full-data macro F1</div></div>
+      <div class="metric"><div class="value">1.7%</div><div class="label">global full-data prediction error in UMAP diagnostic</div></div>
+    </div>
+    <img class="figure large" src="../outputs/refined_scanvi_v1/figures/scanvi_full_umap_panels.png" />
+    <div class="caption">Refined SCANVI full-data diagnostic panels. Errors are concentrated near boundaries and transition zones.</div>
+  </section>
+
+  <section class="slide" data-slide="6">
+    <div class="eyebrow">Model Evaluation</div>
+    <h2>Zero-shot performance is good for major classes, with expected weakness in rare refined states</h2>
+    <div class="metrics">
+      <div class="metric"><div class="value">0.897</div><div class="label">zero-shot weighted F1</div></div>
+      <div class="metric"><div class="value">0.734</div><div class="label">zero-shot macro F1</div></div>
+      <div class="metric"><div class="value">25,577</div><div class="label">held-out cells included in zero-shot evaluation</div></div>
+      <div class="metric"><div class="value">11</div><div class="label">held-out classes with enough cells for metric reporting</div></div>
+    </div>
+    <div class="grid2 reverse">
+      <div>
+        <img class="figure medium" src="../outputs/refined_scanvi_v1/figures/scanvi_zeroshot_umap_panels.png" />
+      </div>
+      <div>
+        <h3>Interpretation</h3>
+        <ul>
+          <li>B, T, transitional cytotoxic, mature cytotoxic, and lung cytotoxic NK transfer well to held-out datasets.</li>
+          <li>Rare refined states have lower macro-F1 impact because they are small or unevenly represented in held-out data.</li>
+          <li>The gap between weighted and macro F1 is expected for this label set and should be shown transparently.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="7">
+    <div class="eyebrow">Zero-Shot Error Structure</div>
+    <h2>Held-out errors are localized, not spread across the entire embedding</h2>
+    <div class="grid2">
+      <div>
+        <h3>Where the model struggles</h3>
+        <ul>
+          <li>Errors concentrate near interfaces between related NK states.</li>
+          <li>The rare refined classes are the main limitation for macro F1.</li>
+          <li>This supports v1 as usable, with a clear list of states to revisit when more held-out evidence accumulates.</li>
+        </ul>
+        <div class="takeaway">The model is not randomly confused; the difficult areas are biologically adjacent regions.</div>
+      </div>
+      <div>
+        <img class="figure large" src="../outputs/refined_scanvi_v1/figures/scanvi_zeroshot_local_error_rate.png" />
+        <div class="caption">Zero-shot local error rate from held-out cells only.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="8">
+    <div class="eyebrow">Zero-Shot Class Detail</div>
+    <h2>The held-out performance is strongest for common classes and weaker for small refined labels</h2>
+    <div class="grid2">
+      <div>
+        <table>
+          <thead><tr><th>Class</th><th>Held-out n</th><th>F1</th><th>Accuracy</th></tr></thead>
+          <tbody>
+            <tr><td>B</td><td>1,405</td><td>0.986</td><td>0.981</td></tr>
+            <tr><td>Transitional Cytotoxic</td><td>3,310</td><td>0.963</td><td>0.965</td></tr>
+            <tr><td>T</td><td>5,281</td><td>0.943</td><td>0.935</td></tr>
+            <tr><td>Mature Cytotoxic</td><td>9,810</td><td>0.901</td><td>0.924</td></tr>
+            <tr><td>Lung Cytotoxic NK</td><td>4,535</td><td>0.822</td><td>0.791</td></tr>
+            <tr><td>Mature Cytotoxic TCF7+</td><td>136</td><td>0.751</td><td>0.699</td></tr>
+            <tr><td>Cytokine-Stimulated CCR7+</td><td>330</td><td>0.619</td><td>0.500</td></tr>
+            <tr><td>Lung GZMK+ XCL1+ NK</td><td>236</td><td>0.559</td><td>0.479</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>How to read this</h3>
+        <p>The refined model is reliable for the dominant biology and reference classes. Rare and dataset-restricted states are useful labels, but we should present them as v1 states with limited zero-shot support.</p>
+        <div class="takeaway">This is a good model for a first refined reference, not a final biological taxonomy.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="9">
+    <div class="eyebrow">What We Locked</div>
+    <h2>Refined annotation v1 is ready to use as the current reference target</h2>
+    <div class="grid3">
+      <div class="panel">
+        <h3>Annotation</h3>
+        <p>Full-data `leiden_0_4` was converted into 15 refined labels, keeping the label set compact and trainable.</p>
+      </div>
+      <div class="panel">
+        <h3>Model</h3>
+        <p>SCANVI was retrained directly on `NK_State_refined` with `assay_clean` as the batch key.</p>
+      </div>
+      <div class="panel">
+        <h3>Evaluation</h3>
+        <p>Validation is strong, full-data predictions are stable, and zero-shot behavior is interpretable.</p>
+      </div>
+    </div>
+    <div class="takeaway">
+      Working conclusion: refined annotation v1 is suitable for downstream labeling and reporting, while rare held-out states should remain on the watch list.
+    </div>
+  </section>
+
+  <section class="slide" data-slide="10">
+    <div class="eyebrow">Next Steps</div>
+    <h2>Use v1 as the working reference, then tighten only where the evidence says to</h2>
+    <div class="grid2">
+      <div>
+        <ul>
+          <li>Use refined SCANVI v1 for current annotation outputs.</li>
+          <li>Update the report with the full-data clustering and refined-model evaluation.</li>
+          <li>Track rare-state zero-shot performance, especially cytokine-stimulated proliferative and tissue-resident transitional cells.</li>
+          <li>Revisit the lung labels only if additional marker review or external validation supports further splitting.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="bigquote">The main progress is not just a better model score. It is a cleaner annotation target that matches the structure we see in the full dataset.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
