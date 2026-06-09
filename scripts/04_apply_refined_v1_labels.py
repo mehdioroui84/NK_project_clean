@@ -23,6 +23,7 @@ POINT_SIZE = 0.06
 POINT_ALPHA = 0.52
 QC_POINT_SIZE = 0.08
 QC_POINT_ALPHA = 0.95
+MAX_LEGEND_LABEL_CHARS = 38
 
 PAN_NK_SCORE_MARKERS = [
     "NCR1",
@@ -389,6 +390,10 @@ def plot_annotation_qc_umap(adata, figdir):
     print(f"[SAVE] {availability_path}")
 
     signed_score = zscore(positive_score) - zscore(excluded_score)
+    refined_values = adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values
+    leiden_values = adata.obs[GROUPBY].astype(str).values
+    refined_label_order = label_order_by_cluster(refined_values, leiden_values)
+    refined_label_colors = label_colors_from_cluster_colors(refined_label_order, refined_values, leiden_values)
     fig, axes = plt.subplots(3, 3, figsize=(24, 22))
     axes = axes.ravel()
     fig.suptitle("Annotation QC: cluster labels, metadata, and NK marker scores", fontsize=15)
@@ -404,10 +409,12 @@ def plot_annotation_qc_umap(adata, figdir):
     scatter_categorical(
         axes[1],
         xy,
-        adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values,
+        refined_values,
         f"2. final annotation: {cfg.REFINED_LABEL_KEY}",
         show_legend=True,
         annotate_clusters=False,
+        category_order=refined_label_order,
+        colors_override=refined_label_colors,
     )
     scatter_categorical(
         axes[2],
@@ -446,7 +453,7 @@ def plot_annotation_qc_umap(adata, figdir):
         axes[6],
         xy,
         positive_score,
-        f"7. positive NK score (standardized; Reds; {len(positive_used)}/{len(PAN_NK_SCORE_MARKERS)} genes)",
+        "7. positive NK score (standardized; Reds)",
         cmap="Reds",
         robust=True,
     )
@@ -454,7 +461,7 @@ def plot_annotation_qc_umap(adata, figdir):
         axes[7],
         xy,
         excluded_score,
-        f"8. NK-excluded score (standardized; Blues; {len(excluded_used)}/{len(NK_EXCLUDED_SCORE_MARKERS)} genes)",
+        "8. NK-excluded score (standardized; Blues)",
         cmap="Blues",
         robust=True,
     )
@@ -474,6 +481,10 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
     dataset = obs_values(adata, cfg.DATASET_KEY)
     assay = obs_values(adata, cfg.ASSAY_CLEAN_KEY)
     signed_score = zscore(positive_score) - zscore(excluded_score)
+    refined_values = adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values
+    leiden_values = adata.obs[GROUPBY].astype(str).values
+    refined_label_order = label_order_by_cluster(refined_values, leiden_values)
+    refined_label_colors = label_colors_from_cluster_colors(refined_label_order, refined_values, leiden_values)
 
     fig = plt.figure(figsize=(24, 22))
     fig.suptitle("Annotation QC: 3D UMAP labels, metadata, and NK marker scores", fontsize=15)
@@ -491,10 +502,12 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
     scatter_categorical_3d(
         axes[1],
         xyz,
-        adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values,
+        refined_values,
         f"2. final annotation: {cfg.REFINED_LABEL_KEY}",
         show_legend=True,
         annotate_clusters=False,
+        category_order=refined_label_order,
+        colors_override=refined_label_colors,
     )
     scatter_categorical_3d(axes[2], xyz, tissue, "3. Tissue", show_legend=True, annotate_clusters=False)
     scatter_categorical_3d(axes[3], xyz, dataset, "4. Dataset ID", show_legend=False, annotate_clusters=False)
@@ -512,7 +525,7 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
         axes[6],
         xyz,
         positive_score,
-        f"7. positive NK score (standardized; Reds; {len(positive_used)}/{len(PAN_NK_SCORE_MARKERS)} genes)",
+        "7. positive NK score (standardized; Reds)",
         cmap="Reds",
         robust=True,
     )
@@ -520,7 +533,7 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
         axes[7],
         xyz,
         excluded_score,
-        f"8. NK-excluded score (standardized; Blues; {len(excluded_used)}/{len(NK_EXCLUDED_SCORE_MARKERS)} genes)",
+        "8. NK-excluded score (standardized; Blues)",
         cmap="Blues",
         robust=True,
     )
@@ -746,10 +759,12 @@ def scatter_categorical(
     *,
     show_legend=True,
     annotate_clusters=False,
+    category_order=None,
+    colors_override=None,
 ):
     values = np.asarray(values).astype(str)
-    categories = sorted(set(values), key=category_sort_key)
-    colors = category_colors(categories)
+    categories = ordered_categories(values, category_order)
+    colors = colors_override or category_colors(categories)
 
     for category in categories:
         mask = values == category
@@ -787,7 +802,7 @@ def scatter_categorical(
             markerfacecolor=colors[category],
             markeredgecolor="none",
             alpha=1.0,
-            label=category,
+            label=short_legend_label(category),
         )
         for category in categories
     ]
@@ -809,10 +824,12 @@ def scatter_categorical_3d(
     *,
     show_legend=True,
     annotate_clusters=False,
+    category_order=None,
+    colors_override=None,
 ):
     values = np.asarray(values).astype(str)
-    categories = sorted(set(values), key=category_sort_key)
-    colors = category_colors(categories)
+    categories = ordered_categories(values, category_order)
+    colors = colors_override or category_colors(categories)
 
     for category in categories:
         mask = values == category
@@ -844,7 +861,7 @@ def scatter_categorical_3d(
             markerfacecolor=colors[category],
             markeredgecolor="none",
             alpha=1.0,
-            label=category,
+            label=short_legend_label(category),
         )
         for category in categories
     ]
@@ -856,6 +873,58 @@ def scatter_categorical_3d(
         bbox_to_anchor=(1.02, 1.0),
         handletextpad=0.4,
     )
+
+
+def short_legend_label(label: str, *, max_chars: int = MAX_LEGEND_LABEL_CHARS) -> str:
+    text = str(label)
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip("_- ") + "..."
+
+
+def ordered_categories(values, category_order=None):
+    seen = set(np.asarray(values).astype(str))
+    if category_order:
+        ordered = [str(value) for value in category_order if str(value) in seen]
+        ordered.extend(sorted(seen - set(ordered), key=category_sort_key))
+        return ordered
+    return sorted(seen, key=category_sort_key)
+
+
+def label_order_by_cluster(labels, clusters):
+    frame = pd.DataFrame(
+        {
+            "label": np.asarray(labels).astype(str),
+            "cluster": np.asarray(clusters).astype(str),
+        }
+    )
+    rows = []
+    for label, group in frame.groupby("label", sort=False):
+        cluster_counts = group["cluster"].value_counts()
+        dominant_cluster = cluster_counts.index[0]
+        rows.append((cluster_sort_key(dominant_cluster), str(label)))
+    rows.sort(key=lambda item: item[0])
+    return [label for _, label in rows]
+
+
+def label_colors_from_cluster_colors(label_order, labels, clusters):
+    label_to_cluster = {}
+    frame = pd.DataFrame(
+        {
+            "label": np.asarray(labels).astype(str),
+            "cluster": np.asarray(clusters).astype(str),
+        }
+    )
+    for label in label_order:
+        sub = frame.loc[frame["label"] == str(label), "cluster"]
+        if sub.empty:
+            continue
+        label_to_cluster[str(label)] = sub.value_counts().index[0]
+    cluster_colors = category_colors(sorted(set(clusters), key=category_sort_key))
+    return {
+        label: cluster_colors.get(cluster, "#999999")
+        for label, cluster in label_to_cluster.items()
+    }
 
 
 def format_3d_axis(ax, title, xyz):

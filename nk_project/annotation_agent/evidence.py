@@ -19,7 +19,8 @@ from nk_project.annotation_agent.taxonomy_reference import load_taxonomy_entries
 TAXONOMY_DE_FDR = 0.05
 TAXONOMY_DE_LOGFC = 0.25
 TAXONOMY_DE_MIN_PCT = 0.10
-TAXONOMY_DE_MAX_GENES = 100
+TAXONOMY_DE_TOP_N_PER_DIRECTION = 50
+TAXONOMY_DE_MAX_GENES = 2 * TAXONOMY_DE_TOP_N_PER_DIRECTION
 
 
 @dataclass
@@ -148,7 +149,8 @@ def load_cluster_evidence(paths: EvidencePaths, *, top_n: int = 50) -> dict[str,
                 "source": paths.all_markers if all_markers is not None else paths.top_markers,
                 "positive": f"pvals_adj<{TAXONOMY_DE_FDR}, logfoldchanges>{TAXONOMY_DE_LOGFC}, pct_in_cluster>={TAXONOMY_DE_MIN_PCT}",
                 "negative": f"pvals_adj<{TAXONOMY_DE_FDR}, logfoldchanges<-{TAXONOMY_DE_LOGFC}, pct_in_reference>={TAXONOMY_DE_MIN_PCT}",
-                "ranking": "abs(logfoldchanges) descending, then pvals_adj ascending",
+                "ranking": "top positive logfoldchanges descending and top negative logfoldchanges ascending, each then pvals_adj ascending",
+                "max_genes_per_direction": TAXONOMY_DE_TOP_N_PER_DIRECTION,
                 "max_total_genes": TAXONOMY_DE_MAX_GENES,
                 "n_selected_positive": len(taxonomy_positive_genes),
                 "n_selected_negative": len(taxonomy_negative_genes),
@@ -268,14 +270,19 @@ def select_taxonomy_de_records(
     if pct_ref_col:
         negative &= rows[pct_ref_col] >= TAXONOMY_DE_MIN_PCT
 
-    selected = rows.loc[positive | negative].copy()
-    if selected.empty:
+    positive_rows = rows.loc[positive].copy()
+    negative_rows = rows.loc[negative].copy()
+    if positive_rows.empty and negative_rows.empty:
         return fallback_records[:TAXONOMY_DE_MAX_GENES]
-    selected["_abs_logfoldchanges"] = selected["logfoldchanges"].abs()
-    selected = selected.sort_values(
-        ["_abs_logfoldchanges", "pvals_adj"],
+    positive_rows = positive_rows.sort_values(
+        ["logfoldchanges", "pvals_adj"],
         ascending=[False, True],
-    ).head(TAXONOMY_DE_MAX_GENES)
+    ).head(TAXONOMY_DE_TOP_N_PER_DIRECTION)
+    negative_rows = negative_rows.sort_values(
+        ["logfoldchanges", "pvals_adj"],
+        ascending=[True, True],
+    ).head(TAXONOMY_DE_TOP_N_PER_DIRECTION)
+    selected = pd.concat([positive_rows, negative_rows], ignore_index=True)
     return marker_records(selected)
 
 
@@ -380,8 +387,8 @@ def lineage_sanity_check(
 
     if not strongest_group or n_non_nk_positive == 0:
         return {
-            "summary": "No strong non-NK marker signal detected.",
-            "interpretation": "No lineage sanity concern from the non-NK marker panel.",
+            "summary": "No strong T-lineage marker signal detected.",
+            "interpretation": "No T-lineage sanity concern from the curated T marker panel.",
         }
 
     pan_nk_broad = (
@@ -583,6 +590,7 @@ def compact_cluster_evidence(data: dict[str, Any]) -> dict[str, Any]:
             "positive": taxonomy_filter.get("positive"),
             "negative": taxonomy_filter.get("negative"),
             "ranking": taxonomy_filter.get("ranking"),
+            "max_genes_per_direction": taxonomy_filter.get("max_genes_per_direction"),
             "max_total_genes": taxonomy_filter.get("max_total_genes"),
             "n_selected_positive": taxonomy_filter.get("n_selected_positive"),
             "n_selected_negative": taxonomy_filter.get("n_selected_negative"),

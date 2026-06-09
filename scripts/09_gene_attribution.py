@@ -22,6 +22,7 @@ from scipy import sparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from configs import default_config as cfg
+from nk_project.annotation_agent.taxonomy_reference import load_taxonomy_entries
 from nk_project.io_utils import ensure_dirs
 
 
@@ -42,8 +43,31 @@ DEFAULT_TARGET_STATES = [
 ]
 SANITY_TARGET_STATES = ["T", "B"]
 
+NON_NK_LABEL_TOKENS = (
+    "non-nk",
+    "non_nk",
+    "non nk",
+    "b cell",
+    "b-cell",
+    "b_cells",
+    "b-lineage",
+    "t cell",
+    "t-cell",
+    "t_cells",
+    "cd3",
+    "myeloid",
+    "monocyte",
+    "macrophage",
+    "erythroid",
+    "epithelial",
+    "stromal",
+    "fibroblast",
+    "endothelial",
+)
+
 BROAD_EXACT_GENES = {"MALAT1", "B2M", "TMSB4X", "HBB"}
 BROAD_PREFIXES = ("MT-", "RPS", "RPL", "HBA")
+TAXONOMY_HIGHLIGHT_COLOR = "#c27c00"
 
 
 class SCANVIClassifierWrapper(nn.Module):
@@ -136,6 +160,7 @@ def main() -> None:
     print("[LABEL_ORDER] " + ", ".join(f"{i}:{label}" for i, label in enumerate(label_order)))
 
     target_states = resolve_target_states(args, label_order, proba.columns)
+    target_states = filter_target_states_by_label_and_prediction(obs, proba, target_states, args)
     if not target_states:
         raise ValueError("No target states remain after filtering.")
     print("[TARGET_STATES] " + "; ".join(target_states))
@@ -147,7 +172,8 @@ def main() -> None:
         for state in target_states:
             selected = select_cells_for_state(obs, proba, state, args)
             n_used = min(len(selected), args.max_cells_per_state) if args.max_cells_per_state else len(selected)
-            print(f"  {state:45s} eligible={len(selected):7,} used={n_used:7,}")
+            status = "keep" if len(selected) >= args.min_attribution_cells else "skip"
+            print(f"  {state:45s} eligible={len(selected):7,} used={n_used:7,} {status}")
         print("[DRY-RUN] Configuration is valid; skipping attribution and output writing.")
         return
 
@@ -166,6 +192,12 @@ def main() -> None:
         selected = select_cells_for_state(obs, proba, state, args)
         if selected.empty:
             print(f"[SKIP] {state}: no correctly predicted high-confidence cells")
+            continue
+        if len(selected) < args.min_attribution_cells:
+            print(
+                f"[SKIP] {state}: {len(selected):,} eligible high-confidence cells "
+                f"< --min-attribution-cells {args.min_attribution_cells:,}"
+            )
             continue
 
         selected_positions = obs.index.get_indexer(selected.index)
@@ -215,7 +247,7 @@ def main() -> None:
     save_combined_tables(ranked_tables, table_dir, args.top_n)
     save_selected_plot_table(plot_tables, table_dir)
     plot_gene_selection_diagnostics(ranked_tables, plot_tables, fig_dir, args)
-    plot_bar_per_state(plot_tables, fig_dir, None)
+    plot_bar_per_state(plot_tables, fig_dir, None, args)
     plot_heatmap_and_dotplot(plot_tables, fig_dir, None, args)
     save_run_metadata(args, outdir, ref_outdir, model_dir, input_h5ad, obs_path, proba_path, train_names_path, target_states, method)
     print("[DONE] Gene attribution analysis complete.")
@@ -278,12 +310,39 @@ def parse_args() -> argparse.Namespace:
         help="Append T and B labels to the default target states as sanity-check classes.",
     )
     parser.add_argument(
+        "--exclude-non-nk-labels",
+        action="store_true",
+        help=(
+            "Drop labels that look like Non-NK/B/T/myeloid/epithelial/stromal classes. "
+            "This is useful for publication plots focused only on NK-state labels."
+        ),
+    )
+    parser.add_argument(
+        "--min-predicted-cells",
+        type=int,
+        default=0,
+        help=(
+            "Keep only labels with at least this many predicted cells in the supplied "
+            "probability table after split filtering. Use 1 to require the label to appear "
+            "in the in-house prediction results."
+        ),
+    )
+    parser.add_argument(
         "--cell-split",
         default="all",
         choices=["all", "Train", "Val", "Held-out"],
         help="Which SCANVI split to attribute. Default: all evaluated cells.",
     )
     parser.add_argument("--min-proba", type=float, default=0.70)
+    parser.add_argument(
+        "--min-attribution-cells",
+        type=int,
+        default=0,
+        help=(
+            "Skip labels with fewer than this many eligible cells after label, prediction, "
+            "confidence, and split filters. Use 1000 to avoid noisy attribution panels."
+        ),
+    )
     parser.add_argument("--max-cells-per-state", type=int, default=1000)
     parser.add_argument("--ig-steps", type=int, default=50)
     parser.add_argument("--ig-batch-size", type=int, default=128)
@@ -324,6 +383,17 @@ def parse_args() -> argparse.Namespace:
             "`input` preserves the selected gene order from each state's ranked list. "
             "`clustered` orders genes by hierarchical clustering. "
             "`max_state` groups genes by the state where they have maximum absolute attribution."
+        ),
+    )
+    parser.add_argument(
+        "--bar-x-scale",
+        choices=["shared", "free", "per_state"],
+        default="shared",
+        help=(
+            "X-axis scaling for per-state attribution bar panels. Default 'shared' "
+            "uses one symmetric attribution scale across all states so magnitudes are comparable. "
+            "'per_state' scales each panel to that state's selected min/max attribution for readability. "
+            "'free' preserves the older matplotlib autoscaling."
         ),
     )
     parser.add_argument("--baseline", choices=["zero", "gene_mean"], default="zero")
@@ -404,7 +474,7 @@ def plot_existing_attribution_table(
     save_combined_tables(ranked_tables, table_dir, args.top_n)
     save_selected_plot_table(plot_tables, table_dir)
     plot_gene_selection_diagnostics(ranked_tables, plot_tables, fig_dir, args)
-    plot_bar_per_state(plot_tables, fig_dir, None)
+    plot_bar_per_state(plot_tables, fig_dir, None, args)
     plot_heatmap_and_dotplot(plot_tables, fig_dir, None, args)
 
     metadata = {
@@ -447,6 +517,28 @@ def reorder_existing_ranked_tables(
 def is_broad_gene(gene: str) -> bool:
     gene_upper = str(gene).upper()
     return gene_upper in BROAD_EXACT_GENES or gene_upper.startswith(BROAD_PREFIXES)
+
+
+def load_taxonomy_marker_gene_set() -> set[str]:
+    """Return all genes mentioned anywhere in the NK taxonomy reference."""
+    genes: set[str] = set()
+    for entry in load_taxonomy_entries():
+        for marker_list in entry.markers.values():
+            genes.update(str(gene).upper() for gene in marker_list)
+    return genes
+
+
+def annotate_taxonomy_highlight_columns(df: pd.DataFrame, taxonomy_genes: set[str]) -> pd.DataFrame:
+    out = df.copy()
+    out["in_taxonomy_reference"] = out["gene"].astype(str).str.upper().isin(taxonomy_genes)
+    return out
+
+
+def style_taxonomy_tick_labels(axis, taxonomy_genes: set[str]) -> None:
+    for tick in axis.get_ticklabels():
+        if tick.get_text().upper() in taxonomy_genes:
+            tick.set_color(TAXONOMY_HIGHLIGHT_COLOR)
+            tick.set_fontweight("bold")
 
 
 def set_global_seed(seed: int) -> None:
@@ -606,6 +698,48 @@ def resolve_target_states(args: argparse.Namespace, label_order: list[str], prob
     if missing:
         print("[WARN] Missing target states will be skipped: " + "; ".join(missing))
     return [state for state in target_states if state in available]
+
+
+def is_non_nk_label(label: str) -> bool:
+    text = str(label).lower().replace("/", " ")
+    return any(token in text for token in NON_NK_LABEL_TOKENS)
+
+
+def filter_target_states_by_label_and_prediction(
+    obs: pd.DataFrame,
+    proba: pd.DataFrame,
+    target_states: list[str],
+    args: argparse.Namespace,
+) -> list[str]:
+    out = list(target_states)
+
+    if args.exclude_non_nk_labels:
+        before = len(out)
+        removed = [state for state in out if is_non_nk_label(state)]
+        out = [state for state in out if state not in removed]
+        print(f"[FILTER_LABELS] exclude non-NK-like labels: {before} -> {len(out)} labels")
+        if removed:
+            print("[FILTER_LABELS_REMOVED] " + "; ".join(removed))
+
+    if args.min_predicted_cells > 0:
+        pred = proba.idxmax(axis=1).astype(str)
+        if args.cell_split != "all":
+            if "_split" not in obs.columns:
+                raise KeyError("Requested --cell-split but `_split` is missing from obs metadata.")
+            pred = pred.loc[obs["_split"].astype(str).eq(args.cell_split)]
+        counts = pred.value_counts()
+        before = len(out)
+        removed = [state for state in out if int(counts.get(state, 0)) < args.min_predicted_cells]
+        out = [state for state in out if state not in removed]
+        print(
+            "[FILTER_LABELS] minimum predicted cells "
+            f">= {args.min_predicted_cells}: {before} -> {len(out)} labels"
+        )
+        if removed:
+            details = ", ".join(f"{state}={int(counts.get(state, 0))}" for state in removed)
+            print("[FILTER_LABELS_REMOVED_LOW_PRED] " + details)
+
+    return out
 
 
 def make_batch_indices(model, adata, args: argparse.Namespace, device: torch.device) -> torch.Tensor:
@@ -826,16 +960,18 @@ def build_ranked_table(gene_names: list[str], result: dict[str, np.ndarray | int
 
 
 def save_combined_tables(ranked_tables: dict[str, pd.DataFrame], table_dir: str, top_n: int) -> None:
+    taxonomy_genes = load_taxonomy_marker_gene_set()
     full_rows = []
     top_rows = []
     wide = None
 
     for state, df in ranked_tables.items():
-        state_df = df.copy()
+        state_df = annotate_taxonomy_highlight_columns(df, taxonomy_genes)
         state_df.insert(0, "NK_State_refined", state)
         full_rows.append(state_df)
 
         top = df.head(top_n).copy()
+        top = annotate_taxonomy_highlight_columns(top, taxonomy_genes)
         top.insert(0, "NK_State_refined", state)
         top_rows.append(top)
 
@@ -888,9 +1024,10 @@ def select_plot_tables(ranked_tables: dict[str, pd.DataFrame], args: argparse.Na
 
 
 def save_selected_plot_table(plot_tables: dict[str, pd.DataFrame], table_dir: str) -> None:
+    taxonomy_genes = load_taxonomy_marker_gene_set()
     rows = []
     for state, df in plot_tables.items():
-        out = df.copy()
+        out = annotate_taxonomy_highlight_columns(df, taxonomy_genes)
         out.insert(0, "NK_State_refined", state)
         rows.append(out)
     path = os.path.join(table_dir, "gene_attribution_selected_plot_genes.csv")
@@ -963,11 +1100,32 @@ def plot_gene_selection_diagnostics(
     print(f"[SAVE] {summary_path}")
 
 
-def plot_bar_per_state(ranked_tables: dict[str, pd.DataFrame], fig_dir: str, top_n: int | None) -> None:
+def plot_bar_per_state(
+    ranked_tables: dict[str, pd.DataFrame],
+    fig_dir: str,
+    top_n: int | None,
+    args: argparse.Namespace,
+) -> None:
+    taxonomy_genes = load_taxonomy_marker_gene_set()
     n_states = len(ranked_tables)
     n_cols = min(3, n_states)
     n_rows = ceil(n_states / n_cols)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(5.2 * n_cols, 4.2 * n_rows), squeeze=False)
+
+    shared_xlim = None
+    if args.bar_x_scale == "shared":
+        values = []
+        for df in ranked_tables.values():
+            top = df if top_n is None else df.head(top_n)
+            values.extend(pd.to_numeric(top["mean_attr"], errors="coerce").dropna().tolist())
+        if values:
+            min_value = min(values)
+            max_value = max(values)
+            value_range = max_value - min_value
+            pad = value_range * 0.06 if value_range > 0 else max(abs(min_value), abs(max_value), 1.0) * 0.06
+            shared_xlim = (min(0.0, min_value - pad), max(0.0, max_value + pad))
+        else:
+            shared_xlim = (-1.0, 1.0)
 
     for ax in axes.ravel():
         ax.axis("off")
@@ -977,15 +1135,39 @@ def plot_bar_per_state(ranked_tables: dict[str, pd.DataFrame], fig_dir: str, top
         top = df if top_n is None else df.head(top_n)
         top = top.sort_values("mean_attr", ascending=True)
         colors = np.where(top["mean_attr"].values >= 0, "#b23a48", "#457b9d")
-        ax.barh(top["gene"], top["mean_attr"], color=colors, alpha=0.88)
+        bars = ax.barh(top["gene"], top["mean_attr"], color=colors, alpha=0.88)
+        for bar, gene in zip(bars, top["gene"].astype(str)):
+            if gene.upper() in taxonomy_genes:
+                bar.set_edgecolor(TAXONOMY_HIGHLIGHT_COLOR)
+                bar.set_linewidth(1.5)
         ax.axvline(0, color="#222222", linewidth=0.8)
         ax.set_title(state, fontsize=10, fontweight="bold")
         ax.set_xlabel("Mean Integrated Gradients attribution")
         ax.tick_params(axis="y", labelsize=8)
+        style_taxonomy_tick_labels(ax.yaxis, taxonomy_genes)
+        if shared_xlim is not None:
+            ax.set_xlim(*shared_xlim)
+        elif args.bar_x_scale == "per_state":
+            x_values = pd.to_numeric(top["mean_attr"], errors="coerce").dropna()
+            if len(x_values):
+                x_min = min(0.0, float(x_values.min()))
+                x_max = max(0.0, float(x_values.max()))
+                span = x_max - x_min
+                pad = span * 0.08 if span > 0 else 1.0
+                ax.set_xlim(x_min - pad, x_max + pad)
         ax.spines[["top", "right"]].set_visible(False)
 
     title_n = "selected" if top_n is None else f"top {top_n}"
-    fig.suptitle(f"{title_n.capitalize()} classifier-attributed genes per refined NK state", fontsize=13, fontweight="bold")
+    scale_note = {
+        "shared": "shared scale",
+        "per_state": "per-state min/max scale",
+        "free": "free scale",
+    }[args.bar_x_scale]
+    fig.suptitle(
+        f"{title_n.capitalize()} classifier-attributed genes per refined NK state ({scale_note})",
+        fontsize=13,
+        fontweight="bold",
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     save_figure(fig, fig_dir, "gene_attribution_bar_per_state")
 
@@ -996,6 +1178,7 @@ def plot_heatmap_and_dotplot(
     top_n: int | None,
     args: argparse.Namespace,
 ) -> None:
+    taxonomy_genes = load_taxonomy_marker_gene_set()
     union_genes = []
     for df in ranked_tables.values():
         genes = df["gene"].tolist() if top_n is None else df["gene"].head(top_n).tolist()
@@ -1024,6 +1207,7 @@ def plot_heatmap_and_dotplot(
     ax.tick_params(axis="both", which="both", length=0)
     ax.set_xticks(np.arange(len(mean_attr.columns)))
     ax.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=7)
+    style_taxonomy_tick_labels(ax.xaxis, taxonomy_genes)
     ax.set_yticks(np.arange(len(states)))
     ax.set_yticklabels(states, fontsize=9, fontweight="bold")
     title_n = "selected" if top_n is None else f"top {top_n}"
@@ -1041,9 +1225,16 @@ def plot_heatmap_and_dotplot(
             mag = float(mean_abs.loc[state, gene])
             size = 20 + 340 * mag / max_mag
             color = matplotlib.cm.RdBu_r((attr + vmax) / (2 * vmax))
-            ax2.scatter(xi, yi, s=size, color=color, edgecolors="white", linewidths=0.3)
+            if str(gene).upper() in taxonomy_genes:
+                edgecolor = TAXONOMY_HIGHLIGHT_COLOR
+                linewidth = 0.9
+            else:
+                edgecolor = "white"
+                linewidth = 0.3
+            ax2.scatter(xi, yi, s=size, color=color, edgecolors=edgecolor, linewidths=linewidth)
     ax2.set_xticks(np.arange(len(mean_attr.columns)))
     ax2.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=7)
+    style_taxonomy_tick_labels(ax2.xaxis, taxonomy_genes)
     ax2.set_yticks(np.arange(len(states)))
     ax2.set_yticklabels(states, fontsize=9, fontweight="bold")
     ax2.set_xlim(-0.5, len(mean_attr.columns) - 0.5)

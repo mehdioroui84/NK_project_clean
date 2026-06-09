@@ -240,17 +240,21 @@ def main(argv: list[str] | None = None):
     panel_label = "full-dataset" if args.split == "all" else f"{args.split} split"
     file_suffix = "full" if args.split == "all" else safe_name(args.split)
 
-    print("[UMAP] Building UMAP from SCANVI latent space...")
-    ad_umap = sc.AnnData(X=np.zeros((z.shape[0], 1), dtype=np.float32))
-    ad_umap.obsm["X_SCANVI"] = z.astype(np.float32)
-    sc.pp.neighbors(ad_umap, use_rep="X_SCANVI", n_neighbors=cfg.UMAP_N_NEIGHBORS, random_state=cfg.UMAP_SEED)
-    sc.tl.umap(ad_umap, min_dist=cfg.UMAP_MIN_DIST, random_state=cfg.UMAP_SEED)
-    xy = ad_umap.obsm["X_umap"]
+    umap_npy = os.path.join(cfg.LATENT_OUTDIR, "scanvi_full_umap.npy")
+    umap_csv = os.path.join(cfg.TABLE_OUTDIR, "scanvi_full_umap.csv")
+    xy = load_cached_umap(umap_npy, umap_csv, latent_path, obs_names)
+    if xy is None:
+        print("[UMAP] Building UMAP from SCANVI latent space...")
+        ad_umap = sc.AnnData(X=np.zeros((z.shape[0], 1), dtype=np.float32))
+        ad_umap.obsm["X_SCANVI"] = z.astype(np.float32)
+        sc.pp.neighbors(ad_umap, use_rep="X_SCANVI", n_neighbors=cfg.UMAP_N_NEIGHBORS, random_state=cfg.UMAP_SEED)
+        sc.tl.umap(ad_umap, min_dist=cfg.UMAP_MIN_DIST, random_state=cfg.UMAP_SEED)
+        xy = ad_umap.obsm["X_umap"]
 
-    np.save(os.path.join(cfg.LATENT_OUTDIR, "scanvi_full_umap.npy"), xy)
-    pd.DataFrame(xy, index=obs_names, columns=["UMAP1", "UMAP2"]).to_csv(
-        os.path.join(cfg.TABLE_OUTDIR, "scanvi_full_umap.csv")
-    )
+        np.save(umap_npy, xy)
+        pd.DataFrame(xy, index=obs_names, columns=["UMAP1", "UMAP2"]).to_csv(umap_csv)
+    else:
+        print(f"[UMAP] Using cached UMAP: {umap_csv}")
 
     eval_idx = np.flatnonzero(eval_mask)
     rng = np.random.default_rng(cfg.SEED)
@@ -423,6 +427,24 @@ def main(argv: list[str] | None = None):
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)
+
+
+def load_cached_umap(umap_npy: str, umap_csv: str, latent_path: str, obs_names: np.ndarray):
+    if not (os.path.exists(umap_npy) and os.path.exists(umap_csv)):
+        return None
+    if os.path.getmtime(umap_npy) < os.path.getmtime(latent_path):
+        return None
+    try:
+        cached = np.load(umap_npy)
+        cached_index = pd.read_csv(umap_csv, index_col=0).index.astype(str).values
+    except Exception as exc:
+        print(f"[WARN] Could not read cached UMAP; rebuilding. Reason: {exc}")
+        return None
+    if cached.shape != (len(obs_names), 2):
+        return None
+    if not np.array_equal(cached_index, obs_names.astype(str)):
+        return None
+    return cached
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

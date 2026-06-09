@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import sparse
 
 PAIRWISE_TOP_N = 100
 
@@ -352,6 +353,15 @@ def run_pairwise_de_for_pairs(
     pairs: list[tuple[str, str]],
     outdir: str,
     top_n: int = PAIRWISE_TOP_N,
+    de_method: str = "scvi",
+    model_dir: str | None = None,
+    model_class: str = "auto",
+    train_names: str | None = None,
+    marker_fdr: float = 0.02,
+    scvi_de_mode: str = "change",
+    scvi_delta: float = 0.25,
+    scvi_de_batch_size: int = 32768,
+    scvi_batch_correction: bool = True,
 ) -> list[str]:
     if not pairs:
         return []
@@ -366,6 +376,11 @@ def run_pairwise_de_for_pairs(
     if groupby not in adata.obs:
         raise KeyError(f"{groupby!r} not found in AnnData.obs.")
     adata.obs[groupby] = adata.obs[groupby].astype(str)
+    model = None
+    if de_method == "scvi":
+        if not model_dir:
+            raise ValueError("--pairwise-de-method scvi requires --pairwise-model-dir.")
+        model = load_scvi_de_model(model_dir, adata, model_class, train_names=train_names)
 
     written = []
     for cluster_a, cluster_b in pairs:
@@ -395,33 +410,165 @@ def run_pairwise_de_for_pairs(
         meta.to_csv(meta_path)
         print(f"[SAVE] {meta_path}")
 
-        sc.pp.normalize_total(ad, target_sum=1e4)
-        sc.pp.log1p(ad)
-        print(f"[PAIRWISE_DE] {cluster_a} vs {cluster_b}: {ad.n_obs:,} cells")
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="invalid value encountered in divide",
-                category=RuntimeWarning,
-                module=r"scanpy\.tools\._rank_genes_groups",
-            )
-            sc.tl.rank_genes_groups(
-                ad,
+        print(f"[PAIRWISE_DE] {cluster_a} vs {cluster_b}: {ad.n_obs:,} cells | method={de_method}")
+        if de_method == "scvi":
+            de = model.differential_expression(
+                adata=ad,
                 groupby="pairwise_label",
-                method="wilcoxon",
-                pts=True,
-                tie_correct=True,
+                mode=scvi_de_mode,
+                delta=scvi_delta,
+                batch_correction=scvi_batch_correction,
+                batch_size=scvi_de_batch_size,
+                fdr_target=marker_fdr,
+                all_stats=True,
+                silent=False,
             )
-        all_markers = sc.get.rank_genes_groups_df(ad, group=None)
-        all_path = os.path.join(comp_dir, f"{comp_name}_all_markers_wilcoxon.csv")
+            all_markers = standardize_scvi_de_table(de)
+            all_markers = add_pct_nz_columns(ad, all_markers, "pairwise_label")
+            all_path = os.path.join(comp_dir, f"{comp_name}_all_markers_scvi_de.csv")
+            compat_all_path = os.path.join(comp_dir, f"{comp_name}_all_markers_wilcoxon.csv")
+        elif de_method == "scanpy":
+            sc.pp.normalize_total(ad, target_sum=1e4)
+            sc.pp.log1p(ad)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="invalid value encountered in divide",
+                    category=RuntimeWarning,
+                    module=r"scanpy\.tools\._rank_genes_groups",
+                )
+                sc.tl.rank_genes_groups(
+                    ad,
+                    groupby="pairwise_label",
+                    method="wilcoxon",
+                    pts=True,
+                    tie_correct=True,
+                )
+            all_markers = sc.get.rank_genes_groups_df(ad, group=None)
+            all_path = os.path.join(comp_dir, f"{comp_name}_all_markers_wilcoxon.csv")
+            compat_all_path = None
+        else:
+            raise ValueError(f"Unsupported pairwise de_method: {de_method!r}")
+
         all_markers.to_csv(all_path, index=False)
         print(f"[SAVE] {all_path}")
+        if compat_all_path:
+            all_markers.to_csv(compat_all_path, index=False)
+            print(f"[SAVE] {compat_all_path}  # compatibility copy")
 
         top_markers = select_top_markers(all_markers, top_n=top_n)
         top_markers.to_csv(top_path, index=False)
         print(f"[SAVE] {top_path}")
         written.append(top_path)
     return written
+
+
+def load_scvi_de_model(model_dir: str, adata, model_class: str, train_names: str | None = None):
+    if not os.path.exists(model_dir):
+        raise FileNotFoundError(model_dir)
+    import scvi
+    import scarches as sca
+
+    candidates = [model_class] if model_class != "auto" else ["SCVI", "SCANVI"]
+    last_error = None
+    for candidate in candidates:
+        if candidate == "SCVI":
+            model_classes = [scvi.model.SCVI, getattr(sca.models, "SCVI", None)]
+        else:
+            model_classes = [getattr(sca.models, candidate)]
+        model_classes = [cls for cls in model_classes if cls is not None]
+        for cls in model_classes:
+            try:
+                print(f"[PAIRWISE_DE_MODEL_LOAD] trying {cls.__module__}.{cls.__name__} with full AnnData: {model_dir}")
+                return cls.load(model_dir, adata=adata)
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                print(f"[PAIRWISE_DE_MODEL_LOAD_WARN] {cls.__module__}.{cls.__name__} failed: {exc}")
+            if train_names and os.path.exists(train_names):
+                try:
+                    print(f"[PAIRWISE_DE_MODEL_LOAD] retrying with train cells from {train_names}")
+                    names = pd.read_csv(train_names, header=None)[0].astype(str)
+                    common = adata.obs_names.astype(str).intersection(names)
+                    if len(common) == 0:
+                        raise ValueError("No train_obs_names overlap with input AnnData.")
+                    ref_model = adata[common].copy()
+                    model = cls.load(model_dir, adata=ref_model)
+                    cls.prepare_query_anndata(adata, model)
+                    manager = model.adata_manager.transfer_fields(adata, extend_categories=True)
+                    model._register_manager_for_instance(manager)
+                    return model
+                except Exception as exc:  # noqa: BLE001
+                    last_error = exc
+                    print(f"[PAIRWISE_DE_MODEL_LOAD_WARN] train-cell fallback failed: {exc}")
+    raise RuntimeError(f"Could not load model from {model_dir}") from last_error
+
+
+def standardize_scvi_de_table(de: pd.DataFrame) -> pd.DataFrame:
+    df = de.reset_index().copy()
+    if "index" in df.columns and "names" not in df.columns:
+        df = df.rename(columns={"index": "names"})
+    if "gene" in df.columns and "names" not in df.columns:
+        df = df.rename(columns={"gene": "names"})
+    if "group1" in df.columns:
+        df["group"] = df["group1"].astype(str)
+    elif "comparison" in df.columns:
+        df["group"] = df["comparison"].astype(str).str.split(" vs ").str[0]
+    elif "group" not in df.columns:
+        raise KeyError("Could not infer group column from scVI differential_expression output.")
+
+    if "lfc_mean" in df.columns:
+        df["logfoldchanges"] = pd.to_numeric(df["lfc_mean"], errors="coerce")
+    elif "logfoldchanges" not in df.columns:
+        raise KeyError("Could not find lfc_mean/logfoldchanges in scVI DE output.")
+
+    if "bayes_factor" in df.columns:
+        df["scores"] = pd.to_numeric(df["bayes_factor"], errors="coerce")
+    elif "proba_de" in df.columns:
+        df["scores"] = pd.to_numeric(df["proba_de"], errors="coerce")
+    else:
+        df["scores"] = np.nan
+
+    if "proba_de" in df.columns:
+        df["pvals_adj"] = 1.0 - pd.to_numeric(df["proba_de"], errors="coerce")
+    elif "pvals_adj" not in df.columns:
+        df["pvals_adj"] = np.nan
+
+    fdr_cols = [col for col in df.columns if col.startswith("is_de_fdr_")]
+    if fdr_cols:
+        df["is_de_fdr"] = df[fdr_cols[0]].astype(bool)
+    return df
+
+
+def add_pct_nz_columns(adata, markers: pd.DataFrame, groupby: str) -> pd.DataFrame:
+    markers = markers.copy()
+    markers["pct_nz_group"] = np.nan
+    markers["pct_nz_reference"] = np.nan
+    obs_groups = adata.obs[groupby].astype(str)
+    var_names = pd.Index(adata.var_names.astype(str))
+    for group, idx in markers.groupby("group").groups.items():
+        group_mask = obs_groups.eq(str(group)).to_numpy()
+        ref_mask = ~group_mask
+        genes = markers.loc[idx, "names"].astype(str).tolist()
+        present = [gene for gene in genes if gene in var_names]
+        if not present or not np.any(group_mask) or not np.any(ref_mask):
+            continue
+        gene_pos = var_names.get_indexer(present)
+        pct_group = nonzero_fraction(adata.X[group_mask][:, gene_pos])
+        pct_ref = nonzero_fraction(adata.X[ref_mask][:, gene_pos])
+        pct_by_gene = {gene: (float(pct_group[i]), float(pct_ref[i])) for i, gene in enumerate(present)}
+        for row_idx in markers.index[list(idx)]:
+            gene = str(markers.at[row_idx, "names"])
+            if gene not in pct_by_gene:
+                continue
+            markers.at[row_idx, "pct_nz_group"] = pct_by_gene[gene][0]
+            markers.at[row_idx, "pct_nz_reference"] = pct_by_gene[gene][1]
+    return markers
+
+
+def nonzero_fraction(x) -> np.ndarray:
+    if sparse.issparse(x):
+        return np.asarray((x > 0).mean(axis=0)).ravel()
+    return np.asarray((x > 0).mean(axis=0)).ravel()
 
 
 def load_pairwise_evidence(pairwise_dir: str | None, cluster_id: str, *, top_n: int = 20) -> list[dict[str, Any]]:
@@ -471,6 +618,8 @@ def pairwise_marker_records(df: pd.DataFrame) -> list[dict[str, Any]]:
 
 def select_top_markers(markers: pd.DataFrame, *, top_n: int) -> pd.DataFrame:
     df = markers.copy()
+    if "is_de_fdr" in df.columns:
+        df = df[df["is_de_fdr"].fillna(False).astype(bool)].copy()
     if "logfoldchanges" in df.columns:
         df = df[df["logfoldchanges"] > 0].copy()
     sort_cols = [col for col in ["group", "pvals_adj", "scores"] if col in df.columns]

@@ -35,6 +35,7 @@ from nk_project.io_utils import ensure_dirs
 
 DEFAULT_GROUPBY = "leiden_0_4"
 PAIRWISE_TOP_N = 100
+DEFAULT_MAX_DISTANCE_PAIRS_PER_ROUND = 25
 
 
 def main() -> None:
@@ -59,6 +60,9 @@ def main() -> None:
     if args.run_pairwise_split_audit:
         print(f"[PAIRWISE_DISTANCE_QUANTILE] {args.distance_quantile}")
         print(f"[PAIRWISE_MAX_PAIRS] {args.max_distance_pairs_per_round}")
+        print(f"[PAIRWISE_DE_METHOD] {args.pairwise_de_method}")
+        print(f"[PAIRWISE_MODEL_DIR] {args.pairwise_model_dir}")
+        print(f"[PAIRWISE_TRAIN_NAMES] {args.pairwise_train_names}")
     print(f"[ACTIVE_LLM] {args.active_llm}")
 
     evidence = load_evidence(leiden_dir, marker_dir, pairwise_dir, args)
@@ -138,10 +142,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-distance-pairs-per-round",
         type=int,
-        default=50,
+        default=DEFAULT_MAX_DISTANCE_PAIRS_PER_ROUND,
         help=(
             "Only used with --run-pairwise-split-audit. Maximum same-label distant "
-            "cluster pairs to audit. Default: 50."
+            f"cluster pairs to audit. Default: {DEFAULT_MAX_DISTANCE_PAIRS_PER_ROUND}."
         ),
     )
     parser.add_argument(
@@ -149,6 +153,59 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="AnnData.obsm key for centroid distances. Default: auto-detect X_scVI or similar.",
     )
+    parser.add_argument(
+        "--pairwise-de-method",
+        choices=["scvi", "scanpy"],
+        default="scvi",
+        help="DE method for pairwise split audit. Default uses model.differential_expression().",
+    )
+    parser.add_argument(
+        "--pairwise-model-dir",
+        default=None,
+        help="Trained scVI/scANVI model directory for pairwise model-based DE.",
+    )
+    parser.add_argument(
+        "--pairwise-model-class",
+        choices=["auto", "SCVI", "SCANVI"],
+        default="auto",
+        help="Model class for pairwise DE. Default auto tries SCVI then SCANVI.",
+    )
+    parser.add_argument(
+        "--pairwise-train-names",
+        default=None,
+        help="Optional train_obs_names.txt for loading the pairwise DE model with train cells first.",
+    )
+    parser.add_argument(
+        "--pairwise-marker-fdr",
+        type=float,
+        default=0.02,
+        help="FDR target passed to model.differential_expression() for pairwise DE.",
+    )
+    parser.add_argument(
+        "--pairwise-scvi-de-mode",
+        choices=["change", "vanilla"],
+        default="change",
+        help="mode argument for pairwise model.differential_expression().",
+    )
+    parser.add_argument(
+        "--pairwise-scvi-delta",
+        type=float,
+        default=0.25,
+        help="delta argument for pairwise model.differential_expression().",
+    )
+    parser.add_argument(
+        "--pairwise-scvi-de-batch-size",
+        type=int,
+        default=32768,
+        help="Batch size for pairwise model.differential_expression(). Default: 32768.",
+    )
+    parser.add_argument(
+        "--no-pairwise-scvi-batch-correction",
+        dest="pairwise_scvi_batch_correction",
+        action="store_false",
+        help="Turn off batch_correction for pairwise model-based DE. Default is on.",
+    )
+    parser.set_defaults(pairwise_scvi_batch_correction=True)
     parser.add_argument("--llm-retries", type=int, default=5)
     parser.add_argument("--retry-sleep", type=float, default=5.0)
     parser.add_argument(
@@ -173,6 +230,8 @@ def parse_args() -> argparse.Namespace:
         raise ValueError("--distance-quantile must be between 0 and 1.")
     if args.max_distance_pairs_per_round < 1:
         raise ValueError("--max-distance-pairs-per-round must be at least 1.")
+    if args.run_pairwise_split_audit and args.pairwise_de_method == "scvi" and not args.pairwise_model_dir:
+        raise ValueError("--run-pairwise-split-audit with --pairwise-de-method scvi requires --pairwise-model-dir.")
     return args
 
 
@@ -258,6 +317,15 @@ def run_pairwise_split_audit(
         pairs=new_pairs,
         outdir=pairwise_dir,
         top_n=PAIRWISE_TOP_N,
+        de_method=args.pairwise_de_method,
+        model_dir=args.pairwise_model_dir,
+        model_class=args.pairwise_model_class,
+        train_names=args.pairwise_train_names,
+        marker_fdr=args.pairwise_marker_fdr,
+        scvi_de_mode=args.pairwise_scvi_de_mode,
+        scvi_delta=args.pairwise_scvi_delta,
+        scvi_de_batch_size=args.pairwise_scvi_de_batch_size,
+        scvi_batch_correction=args.pairwise_scvi_batch_correction,
     )
 
     evidence = load_evidence(leiden_dir, marker_dir, pairwise_dir, args)

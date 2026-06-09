@@ -18,10 +18,6 @@ PAN_NK_MARKERS: list[str] = [
 
 NON_NK_MARKER_GROUPS: dict[str, list[str]] = {
     "T": ["CD3D", "CD3E", "CD3G", "TRAC", "TRBC1", "TRBC2"],
-    "B": ["MS4A1", "CD79A", "CD79B", "CD19", "BANK1"],
-    "Myeloid": ["LYZ", "LST1", "S100A8", "S100A9", "CST3"],
-    "Erythroid": ["HBB", "HBA1", "HBA2", "AHSP"],
-    "Stromal_Epithelial": ["COL1A1", "DCN", "LUM", "EPCAM", "KRT8", "KRT18", "KRT19"],
 }
 
 
@@ -86,45 +82,6 @@ MARKER_PROGRAMS: dict[str, list[str]] = {
         "TCF7",
         "SELL",
         "LEF1",
-    ],
-    "B cell": [
-        "MS4A1",
-        "CD79A",
-        "CD79B",
-        "BANK1",
-        "BLK",
-        "FCRL1",
-        "IGHM",
-        "IGKC",
-    ],
-    "myeloid": [
-        "LYZ",
-        "LST1",
-        "S100A8",
-        "S100A9",
-        "C5AR1",
-        "CLEC7A",
-        "MS4A7",
-        "MAFB",
-    ],
-    "erythroid": [
-        "HBB",
-        "HBA1",
-        "HBA2",
-        "HBD",
-        "HBM",
-        "AHSP",
-    ],
-    "lung/stromal-like": [
-        "DOCK4",
-        "SLC8A1",
-        "FMN1",
-        "PLXDC2",
-        "SLC1A3",
-        "NHSL1",
-        "LHFPL2",
-        "LRP1",
-        "NRP1",
     ],
 }
 

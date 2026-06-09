@@ -26,10 +26,12 @@ Rules:
 - Weak pan-NK DE is not evidence for Non-NK because the background is mostly NK.
   If pan-NK markers remain broadly expressed, choose the best NK subtype/state
   and flag review rather than calling Non-NK.
-- Before choosing an NK subtype, check whether positive marker programs support
-  a non-NK lineage. If strong non-NK lineage markers are enriched and pan-NK
-  markers are depleted or weak, call Non-NK even if shared NK/T inflammatory
-  genes such as GZMK, XCL1, or IFNG are present.
+- Before choosing an NK subtype, check whether the DE evidence supports a
+  non-NK lineage. Use the curated T-lineage sanity check for the T/NK boundary;
+  for other lineages, rely on the cluster's own top DE genes. If strong non-NK
+  lineage markers are enriched and pan-NK markers are depleted or weak, call
+  Non-NK even if shared NK/T inflammatory genes such as GZMK, XCL1, or IFNG are
+  present.
 - Use tissue, dataset, and assay composition as metadata context for the cluster.
   Tissue may or may not provide biological context or technical concern; dataset
   and assay enrichment may or may not reflect technical concern. Use your best judgment.

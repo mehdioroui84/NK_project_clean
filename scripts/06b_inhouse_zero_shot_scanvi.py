@@ -24,12 +24,22 @@ from nk_project.evaluation.scanvi_full_plots import (
 from nk_project.io_utils import ensure_dirs, save_latent_npz
 
 
+MAX_LEGEND_LABEL_CHARS = 42
+
+
 def main() -> None:
     args = parse_args()
     table_dir = os.path.join(args.outdir, "tables")
     fig_dir = os.path.join(args.outdir, "figures")
     latent_dir = os.path.join(args.outdir, "latents")
     ensure_dirs(args.outdir, table_dir, fig_dir, latent_dir)
+
+    if args.plot_existing:
+        plot_existing_outputs(args, table_dir, fig_dir, latent_dir)
+        print("[DONE] Existing in-house zero-shot plots regenerated.")
+        return
+
+    validate_inference_args(args)
 
     print(f"[INHOUSE] {args.inhouse_h5ad}")
     query_raw = load_inhouse_query(args)
@@ -80,7 +90,9 @@ def main() -> None:
         xy, plot_obs, is_query = build_query_only_umap(query, z_query, args)
     else:
         xy, plot_obs, is_query = build_reference_query_umap(ref_plot, query, z_ref_plot, z_query, args)
+    save_umap_plot_payload(xy, plot_obs, is_query, args, table_dir, latent_dir)
     plot_panels(xy, plot_obs, is_query, args, fig_dir)
+    plot_prediction_proportions(query.obs.copy(), args, fig_dir, table_dir)
 
     print("[DONE] In-house zero-shot complete.")
 
@@ -89,8 +101,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Apply a trained SCANVI model to in-house samples excluding CB07 and make QC plots."
     )
-    parser.add_argument("--ref-h5ad", required=True, help="Reference AnnData used to train the SCANVI model.")
-    parser.add_argument("--model-dir", required=True, help="Trained SCANVI model directory.")
+    parser.add_argument("--ref-h5ad", default=None, help="Reference AnnData used to train the SCANVI model.")
+    parser.add_argument("--model-dir", default=None, help="Trained SCANVI model directory.")
     parser.add_argument(
         "--inhouse-h5ad",
         default="/rsrch5/home/genomic_med/suorouji/projects/lsf_run/seurat_manual.h5ad",
@@ -125,8 +137,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-ref-cells", type=int, default=80000)
     parser.add_argument("--max-query-cells", type=int, default=None)
     parser.add_argument("--query-only-umap", action="store_true")
+    parser.add_argument(
+        "--plot-existing",
+        action="store_true",
+        help=(
+            "Regenerate figures/tables from existing prediction outputs in --outdir. "
+            "Uses cached UMAP plot coordinates when available; otherwise rebuilds UMAP "
+            "from saved latents without rerunning SCANVI inference."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=cfg.SEED)
     return parser.parse_args()
+
+
+def validate_inference_args(args: argparse.Namespace) -> None:
+    missing = []
+    if not args.ref_h5ad:
+        missing.append("--ref-h5ad")
+    if not args.model_dir:
+        missing.append("--model-dir")
+    if missing:
+        raise ValueError(f"Inference mode requires: {', '.join(missing)}")
 
 
 def load_inhouse_query(args: argparse.Namespace) -> sc.AnnData:
@@ -327,10 +358,298 @@ def save_tables(
     print(f"[SAVE] {sample_path}")
 
 
+def plot_existing_outputs(
+    args: argparse.Namespace,
+    table_dir: str,
+    fig_dir: str,
+    latent_dir: str,
+) -> None:
+    prefix = output_prefix(args)
+    obs_path = os.path.join(table_dir, f"{prefix}_obs_predictions.csv")
+    if not os.path.exists(obs_path):
+        raise FileNotFoundError(
+            f"Existing predictions not found: {obs_path}\n"
+            "Run 06b once without --plot-existing to create prediction outputs."
+        )
+    print(f"[LOAD_EXISTING] {obs_path}")
+    query_obs = pd.read_csv(obs_path, index_col=0, low_memory=False)
+    query_obs.index = query_obs.index.astype(str)
+
+    cached = load_umap_plot_payload(args, table_dir, latent_dir)
+    if cached is not None:
+        xy, plot_obs, is_query = cached
+        print("[PLOT_EXISTING] using cached UMAP plot coordinates")
+    else:
+        print("[PLOT_EXISTING] cached UMAP coordinates not found; rebuilding UMAP from saved latents")
+        xy, plot_obs, is_query = rebuild_umap_from_existing_latents(query_obs, args, table_dir, latent_dir)
+        save_umap_plot_payload(xy, plot_obs, is_query, args, table_dir, latent_dir)
+
+    plot_panels(xy, plot_obs, is_query, args, fig_dir)
+    plot_prediction_proportions(query_obs, args, fig_dir, table_dir)
+
+
+def load_umap_plot_payload(
+    args: argparse.Namespace,
+    table_dir: str,
+    latent_dir: str,
+) -> tuple[np.ndarray, pd.DataFrame, np.ndarray] | None:
+    cache_prefix = umap_cache_prefix(args)
+    payload_path = os.path.join(latent_dir, f"{cache_prefix}_umap_plot.npz")
+    obs_path = os.path.join(table_dir, f"{cache_prefix}_umap_plot_obs.csv")
+    if not os.path.exists(payload_path) or not os.path.exists(obs_path):
+        return None
+    payload = np.load(payload_path, allow_pickle=True)
+    plot_obs = pd.read_csv(obs_path, index_col=0, low_memory=False)
+    plot_obs.index = plot_obs.index.astype(str)
+    xy = payload["X_umap"].astype(np.float32)
+    is_query = payload["is_query"].astype(bool)
+    if len(plot_obs) != xy.shape[0] or len(plot_obs) != len(is_query):
+        print("[WARN] Cached UMAP payload shape mismatch; rebuilding from latents.")
+        return None
+    return xy, plot_obs, is_query
+
+
+def save_umap_plot_payload(
+    xy: np.ndarray,
+    plot_obs: pd.DataFrame,
+    is_query: np.ndarray,
+    args: argparse.Namespace,
+    table_dir: str,
+    latent_dir: str,
+) -> None:
+    cache_prefix = umap_cache_prefix(args)
+    payload_path = os.path.join(latent_dir, f"{cache_prefix}_umap_plot.npz")
+    obs_path = os.path.join(table_dir, f"{cache_prefix}_umap_plot_obs.csv")
+    np.savez_compressed(
+        payload_path,
+        X_umap=np.asarray(xy, dtype=np.float32),
+        is_query=np.asarray(is_query, dtype=bool),
+        obs_names=plot_obs.index.astype(str).values,
+    )
+    plot_obs.to_csv(obs_path)
+    print(f"[SAVE] {payload_path}")
+    print(f"[SAVE] {obs_path}")
+
+
+def rebuild_umap_from_existing_latents(
+    query_obs: pd.DataFrame,
+    args: argparse.Namespace,
+    table_dir: str,
+    latent_dir: str,
+) -> tuple[np.ndarray, pd.DataFrame, np.ndarray]:
+    prefix = output_prefix(args)
+    latent_path = os.path.join(latent_dir, f"{prefix}_latents.npz")
+    if not os.path.exists(latent_path):
+        raise FileNotFoundError(
+            f"Existing query latents not found: {latent_path}\n"
+            "Run 06b once without --plot-existing to create latents."
+        )
+    latent = np.load(latent_path, allow_pickle=True)
+    z_query = latent["X_SCANVI"].astype(np.float32)
+    obs_names = latent["obs_names"].astype(str)
+    query_obs = align_existing_obs_to_latents(query_obs, obs_names)
+
+    if args.query_only_umap:
+        return build_query_only_umap_from_obs(query_obs, z_query, args)
+
+    if not args.model_dir:
+        raise ValueError(
+            "--plot-existing needs --model-dir when cached UMAP is absent and "
+            "reference background must be rebuilt. Re-run with --query-only-umap "
+            "or provide --model-dir."
+        )
+    ref_plot, z_ref_plot = load_reference_latent_background(args)
+    return build_reference_query_umap_from_obs(ref_plot, query_obs, z_ref_plot, z_query, args)
+
+
+def align_existing_obs_to_latents(query_obs: pd.DataFrame, obs_names: np.ndarray) -> pd.DataFrame:
+    obs_names = np.asarray(obs_names).astype(str)
+    if set(obs_names).issubset(set(query_obs.index.astype(str))):
+        return query_obs.loc[obs_names].copy()
+    if len(query_obs) == len(obs_names):
+        out = query_obs.copy()
+        out.index = obs_names
+        return out
+    raise ValueError(
+        "Cannot align existing prediction table with saved query latents: "
+        f"{len(query_obs):,} rows vs {len(obs_names):,} latent cells."
+    )
+
+
+def plot_prediction_proportions(
+    obs: pd.DataFrame,
+    args: argparse.Namespace,
+    fig_dir: str,
+    table_dir: str,
+) -> None:
+    if "pred_label" not in obs:
+        return
+
+    prefix = output_prefix(args)
+    label_order = obs["pred_label"].astype(str).value_counts().index.astype(str).tolist()
+    label_colors = distinct_color_map(label_order, preferred=PREFERRED_STATE_COLORS)
+
+    specs = []
+    if args.timepoint_key in obs:
+        time_values = obs[args.timepoint_key].astype(str)
+        specs.append(
+            {
+                "name": "timepoint",
+                "title": "Predicted cell-type proportions by timepoint",
+                "values": time_values,
+                "order": ordered_timepoints(time_values.values),
+                "rotate": 0,
+            }
+        )
+    if args.cb_key in obs:
+        if "rank" in obs:
+            cb_values = cb_labels_with_rank(obs, args.cb_key, "rank")
+            cb_order = ordered_cb_labels_by_rank(obs, args.cb_key, "rank")
+        else:
+            cb_values = obs[args.cb_key].astype(str)
+            cb_order = ordered_categories(cb_values.values)
+        specs.append(
+            {
+                "name": "cb_sample",
+                "title": "Predicted cell-type proportions by CB sample",
+                "values": cb_values,
+                "order": cb_order,
+                "rotate": 25,
+            }
+        )
+    if "_sample_group" in obs:
+        sample_values = obs["_sample_group"].astype(str)
+        specs.append(
+            {
+                "name": "sample_group",
+                "title": "Predicted cell-type proportions by sample group",
+                "values": sample_values,
+                "order": ordered_categories(sample_values.values, ["NT", "CD27", "TROP2", "NA"]),
+                "rotate": 0,
+            }
+        )
+
+    if not specs:
+        return
+
+    fig, axes = plt.subplots(1, len(specs), figsize=(7.2 * len(specs), 5.2), squeeze=False)
+    axes = axes.ravel()
+    for ax, spec in zip(axes, specs):
+        counts, proportions = prediction_proportion_tables(
+            obs["pred_label"].astype(str),
+            spec["values"],
+            spec["order"],
+            label_order,
+        )
+        counts_path = os.path.join(table_dir, f"{prefix}_pred_counts_by_{spec['name']}.csv")
+        prop_path = os.path.join(table_dir, f"{prefix}_pred_proportions_by_{spec['name']}.csv")
+        counts.to_csv(counts_path)
+        proportions.to_csv(prop_path)
+        print(f"[SAVE] {counts_path}")
+        print(f"[SAVE] {prop_path}")
+        draw_stacked_proportion_bars(
+            ax,
+            proportions,
+            label_order,
+            label_colors,
+            title=spec["title"],
+            rotate=spec["rotate"],
+        )
+
+    handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="s",
+            linestyle="",
+            markersize=8,
+            markerfacecolor=label_colors.get(label, "#999999"),
+            markeredgecolor="none",
+            label=short_legend_label(label),
+        )
+        for label in label_order
+    ]
+    fig.legend(
+        handles=handles,
+        loc="center left",
+        bbox_to_anchor=(1.005, 0.5),
+        frameon=False,
+        fontsize=8,
+        handletextpad=0.5,
+    )
+    fig.suptitle("In-house predicted cell-type proportions", fontsize=14)
+    fig.tight_layout(rect=[0, 0, 0.86, 0.94])
+    png = os.path.join(fig_dir, f"{prefix}_predicted_label_proportions.png")
+    pdf = os.path.join(fig_dir, f"{prefix}_predicted_label_proportions.pdf")
+    fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
+    fig.savefig(pdf, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"[SAVE] {png}")
+    print(f"[SAVE] {pdf}")
+
+
+def prediction_proportion_tables(
+    labels: pd.Series,
+    group_values: pd.Series,
+    group_order: list[str],
+    label_order: list[str],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    frame = pd.DataFrame(
+        {
+            "group": group_values.astype(str).values,
+            "pred_label": labels.astype(str).values,
+        }
+    )
+    counts = pd.crosstab(frame["group"], frame["pred_label"])
+    counts = counts.reindex(index=group_order, fill_value=0)
+    counts = counts.reindex(columns=label_order, fill_value=0)
+    totals = counts.sum(axis=1).replace(0, np.nan)
+    proportions = counts.div(totals, axis=0).fillna(0.0)
+    return counts, proportions
+
+
+def draw_stacked_proportion_bars(
+    ax,
+    proportions: pd.DataFrame,
+    label_order: list[str],
+    label_colors: dict[str, str],
+    *,
+    title: str,
+    rotate: int,
+) -> None:
+    x = np.arange(proportions.shape[0])
+    bottom = np.zeros(proportions.shape[0], dtype=float)
+    for label in label_order:
+        if label not in proportions:
+            continue
+        values = proportions[label].to_numpy(dtype=float)
+        ax.bar(
+            x,
+            values,
+            bottom=bottom,
+            color=label_colors.get(label, "#999999"),
+            edgecolor="white",
+            linewidth=0.25,
+            width=0.76,
+        )
+        bottom += values
+    ax.set_title(title, fontsize=10)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Proportion")
+    ax.set_xticks(x)
+    ax.set_xticklabels(proportions.index.astype(str), rotation=rotate, ha="right" if rotate else "center")
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", color="#d9d9d9", linewidth=0.6, alpha=0.7)
+
+
 def build_query_only_umap(query: sc.AnnData, z_query: np.ndarray, args: argparse.Namespace):
-    plot_obs = query.obs.copy()
+    return build_query_only_umap_from_obs(query.obs.copy(), z_query, args)
+
+
+def build_query_only_umap_from_obs(query_obs: pd.DataFrame, z_query: np.ndarray, args: argparse.Namespace):
+    plot_obs = query_obs.copy()
     plot_obs["plot_split"] = "query"
-    is_query = np.ones(query.n_obs, dtype=bool)
+    is_query = np.ones(len(plot_obs), dtype=bool)
     xy = compute_umap(z_query, args.seed)
     return xy, plot_obs, is_query
 
@@ -375,17 +694,26 @@ def build_reference_query_umap(
     z_query: np.ndarray,
     args: argparse.Namespace,
 ):
+    return build_reference_query_umap_from_obs(ref_plot, query.obs.copy(), z_ref, z_query, args)
+
+
+def build_reference_query_umap_from_obs(
+    ref_plot: pd.DataFrame,
+    query_obs_all: pd.DataFrame,
+    z_ref: np.ndarray,
+    z_query: np.ndarray,
+    args: argparse.Namespace,
+):
     rng = np.random.default_rng(args.seed)
 
-    query_idx = np.arange(query.n_obs)
-    if args.max_query_cells and query.n_obs > args.max_query_cells:
+    query_idx = np.arange(len(query_obs_all))
+    if args.max_query_cells and len(query_obs_all) > args.max_query_cells:
         query_idx = np.sort(rng.choice(query_idx, size=args.max_query_cells, replace=False))
-    query_plot = query[query_idx].copy()
+    query_obs = query_obs_all.iloc[query_idx].copy()
     z_query_plot = z_query[query_idx]
 
     ref_obs = ref_plot.copy()
     ref_obs["plot_split"] = "reference"
-    query_obs = query_plot.obs.copy()
     query_obs["plot_split"] = "query"
     plot_obs = pd.concat([ref_obs, query_obs], axis=0)
 
@@ -427,10 +755,21 @@ def plot_panels(xy, obs: pd.DataFrame, is_query: np.ndarray, args: argparse.Name
     scatter_query_continuous(axes[1], xy, is_query, certainty, fig, "2. Certainty")
     cb_values = obs[args.cb_key].astype(str).values if args.cb_key in obs else np.array(["NA"] * len(obs))
     cb_plot_values = cb_values
+    cb_order = None
     if "rank" in obs:
         cb_plot_values = cb_labels_with_rank(obs, args.cb_key, "rank").values
-    cb_colors = distinct_color_map(cb_plot_values[is_query])
-    scatter_query_categories(axes[2], xy, is_query, cb_plot_values, cb_colors, title="3. CB sample", legend=True)
+        cb_order = ordered_cb_labels_by_rank(obs.loc[is_query], args.cb_key, "rank")
+    cb_colors = cb_rank_color_map(cb_order) if cb_order else distinct_color_map(cb_plot_values[is_query])
+    scatter_query_categories(
+        axes[2],
+        xy,
+        is_query,
+        cb_plot_values,
+        cb_colors,
+        title="3. CB sample",
+        legend=True,
+        category_order=cb_order,
+    )
 
     if args.timepoint_key in obs:
         time_values = obs[args.timepoint_key].astype(str).values
@@ -570,18 +909,75 @@ def scatter_query_continuous(ax, xy: np.ndarray, is_query: np.ndarray, values: n
 
 def cb_labels_with_rank(obs: pd.DataFrame, cb_key: str, rank_key: str) -> pd.Series:
     cb = obs[cb_key].astype(str) if cb_key in obs else pd.Series("NA", index=obs.index)
-    rank = obs[rank_key].astype(str)
-    rank = rank.replace({"nan": "", "None": "", "<NA>": ""})
+    rank_raw = obs[rank_key]
+    rank_numeric = pd.to_numeric(rank_raw, errors="coerce")
+    rank = rank_raw.astype(str).replace({"nan": "", "None": "", "<NA>": ""})
     labels = cb.copy()
-    has_rank = rank.ne("")
-    labels.loc[has_rank] = cb.loc[has_rank] + " (rank " + rank.loc[has_rank] + ")"
+    has_numeric_rank = rank_numeric.notna()
+    labels.loc[has_numeric_rank] = (
+        cb.loc[has_numeric_rank]
+        + " (rank "
+        + rank_numeric.loc[has_numeric_rank].map(lambda value: f"{value:g}")
+        + ")"
+    )
+    has_text_rank = rank.ne("") & ~has_numeric_rank
+    labels.loc[has_text_rank] = cb.loc[has_text_rank] + " (rank " + rank.loc[has_text_rank] + ")"
     return labels
+
+
+def ordered_cb_labels_by_rank(obs: pd.DataFrame, cb_key: str, rank_key: str) -> list[str]:
+    if cb_key not in obs or rank_key not in obs:
+        return []
+    labels = cb_labels_with_rank(obs, cb_key, rank_key)
+    frame = pd.DataFrame(
+        {
+            "cb": obs[cb_key].astype(str),
+            "rank": pd.to_numeric(obs[rank_key], errors="coerce"),
+            "label": labels.astype(str),
+        }
+    ).dropna(subset=["rank"])
+    if frame.empty:
+        return []
+    ranked = (
+        frame.groupby(["cb", "label"], sort=False)["rank"]
+        .median()
+        .reset_index()
+        .sort_values("rank", ascending=True)
+    )
+    ordered_labels = ranked["label"].astype(str).tolist()
+    extras = sorted(set(labels.astype(str)) - set(ordered_labels))
+    ordered_labels.extend(extras)
+    return ordered_labels
+
+
+def cb_rank_color_map(labels: list[str]) -> dict[str, str]:
+    palette = [
+        "#08306b",
+        "#2171b5",
+        "#6baed6",
+        "#fcae91",
+        "#fb6a4a",
+        "#a50f15",
+    ]
+    if not labels:
+        return {}
+    if len(labels) <= len(palette):
+        colors = palette[: len(labels)]
+    else:
+        cmap = plt.get_cmap("RdBu_r")
+        colors = [cmap(i / max(len(labels) - 1, 1)) for i in range(len(labels))]
+    return {label: colors[i] for i, label in enumerate(labels)}
 
 
 def output_prefix(args: argparse.Namespace) -> str:
     if args.include_excluded_cb:
         return "inhouse_all_cb_projection"
     return "inhouse_minus_excluded_cb_zero_shot"
+
+
+def umap_cache_prefix(args: argparse.Namespace) -> str:
+    mode = "query_only" if args.query_only_umap else "ref_query"
+    return f"{output_prefix(args)}_{mode}"
 
 
 def figure_title(args: argparse.Namespace) -> str:
@@ -596,6 +992,13 @@ def clean_ax(ax, title: str) -> None:
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
+
+
+def short_legend_label(label: str, *, max_chars: int = MAX_LEGEND_LABEL_CHARS) -> str:
+    text = str(label)
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip("_- ") + "..."
 
 
 def ordered_categories(values: np.ndarray, category_order: list[str] | None = None) -> list[str]:
