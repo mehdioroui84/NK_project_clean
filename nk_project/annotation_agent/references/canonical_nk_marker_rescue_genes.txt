@@ -1,0 +1,36 @@
+# Canonical NK marker genes appended to the model feature set if absent from HVGs.
+# Keep one gene symbol per line.
+NKG7
+GNLY
+PRF1
+GZMB
+GZMA
+GZMH
+KLRD1
+KLRF1
+NCAM1
+FCGR3A
+NCR1
+NCR3
+KLRB1
+KLRC1
+KLRC2
+KLRC3
+KIR2DL1
+KIR2DL2
+KIR2DL3
+KIR3DL1
+KIR3DL2
+TYROBP
+FCER1G
+CD247
+IL2RB
+IL15RA
+TBX21
+EOMES
+XCL1
+XCL2
+CCL3
+CCL4
+CCL5
+IFNG

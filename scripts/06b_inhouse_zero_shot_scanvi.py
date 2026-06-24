@@ -22,6 +22,17 @@ from nk_project.evaluation.scanvi_full_plots import (
     distinct_color_map,
 )
 from nk_project.io_utils import ensure_dirs, save_latent_npz
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    SMALL_TICK_LABEL_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_axis,
+    style_figure,
+    style_legend,
+)
+
+set_presentation_style()
 
 
 MAX_LEGEND_LABEL_CHARS = 42
@@ -532,7 +543,7 @@ def plot_prediction_proportions(
     if not specs:
         return
 
-    fig, axes = plt.subplots(1, len(specs), figsize=(7.2 * len(specs), 5.2), squeeze=False)
+    fig, axes = plt.subplots(1, len(specs), figsize=(8.4 * len(specs), 6.2), squeeze=False)
     axes = axes.ravel()
     for ax, spec in zip(axes, specs):
         counts, proportions = prediction_proportion_tables(
@@ -562,7 +573,7 @@ def plot_prediction_proportions(
             [0],
             marker="s",
             linestyle="",
-            markersize=8,
+            markersize=10,
             markerfacecolor=label_colors.get(label, "#999999"),
             markeredgecolor="none",
             label=short_legend_label(label),
@@ -574,10 +585,12 @@ def plot_prediction_proportions(
         loc="center left",
         bbox_to_anchor=(1.005, 0.5),
         frameon=False,
-        fontsize=8,
+        fontsize=LEGEND_FONT_SIZE,
         handletextpad=0.5,
     )
-    fig.suptitle("In-house predicted cell-type proportions", fontsize=14)
+    fig.suptitle("In-house predicted cell-type proportions", fontsize=20, fontweight="bold")
+    style_all_legends(fig)
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
     fig.tight_layout(rect=[0, 0, 0.86, 0.94])
     png = os.path.join(fig_dir, f"{prefix}_predicted_label_proportions.png")
     pdf = os.path.join(fig_dir, f"{prefix}_predicted_label_proportions.pdf")
@@ -633,13 +646,14 @@ def draw_stacked_proportion_bars(
             width=0.76,
         )
         bottom += values
-    ax.set_title(title, fontsize=10)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_ylim(0, 1)
     ax.set_ylabel("Proportion")
     ax.set_xticks(x)
     ax.set_xticklabels(proportions.index.astype(str), rotation=rotate, ha="right" if rotate else "center")
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.6, alpha=0.7)
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
 
 
 def build_query_only_umap(query: sc.AnnData, z_query: np.ndarray, args: argparse.Namespace):
@@ -738,10 +752,10 @@ def plot_panels(xy, obs: pd.DataFrame, is_query: np.ndarray, args: argparse.Name
     query_obs = obs.loc[is_query]
     query_colors = distinct_color_map(query_obs["pred_label"].astype(str).values, preferred=PREFERRED_STATE_COLORS)
 
-    fig, axes = plt.subplots(2, 3, figsize=(21, 12))
+    fig, axes = plt.subplots(2, 3, figsize=(25, 14))
     axes = axes.ravel()
-    fig.subplots_adjust(left=0.04, right=0.80, top=0.92, bottom=0.06, wspace=0.28, hspace=0.28)
-    fig.suptitle(figure_title(args), fontsize=14)
+    fig.subplots_adjust(left=0.04, right=0.76, top=0.92, bottom=0.07, wspace=0.36, hspace=0.32)
+    fig.suptitle(figure_title(args), fontsize=20, fontweight="bold")
 
     scatter_query_categories(
         axes[0],
@@ -817,6 +831,8 @@ def plot_panels(xy, obs: pd.DataFrame, is_query: np.ndarray, args: argparse.Name
     )
 
     png = os.path.join(fig_dir, f"{output_prefix(args)}_umap_panels.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"[SAVE] {png}")
@@ -872,7 +888,7 @@ def scatter_query_categories(
                 [0],
                 marker="o",
                 linestyle="",
-                markersize=6,
+                markersize=10,
                 markerfacecolor=colors.get(value, "#999999"),
                 markeredgecolor="none",
                 label=value,
@@ -884,9 +900,10 @@ def scatter_query_categories(
             frameon=False,
             loc="upper left",
             bbox_to_anchor=(1.01, 1.0),
-            fontsize=7,
+            fontsize=LEGEND_FONT_SIZE,
             handletextpad=0.4,
         )
+        style_legend(ax.get_legend())
 
 
 def scatter_query_continuous(ax, xy: np.ndarray, is_query: np.ndarray, values: np.ndarray, fig, title: str) -> None:
@@ -987,7 +1004,7 @@ def figure_title(args: argparse.Namespace) -> str:
 
 
 def clean_ax(ax, title: str) -> None:
-    ax.set_title(title, fontsize=10)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():

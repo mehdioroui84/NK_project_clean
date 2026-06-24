@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from configs import default_config as cfg
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import LEGEND_FONT_SIZE, set_presentation_style, style_all_legends, style_axis
+
+set_presentation_style()
 
 
 DEFAULT_GROUPBY = "leiden_0_4"
@@ -307,10 +310,10 @@ def parse_args():
     parser.add_argument(
         "--de-method",
         choices=["scvi", "scanpy", "both"],
-        default="scvi",
+        default="scanpy",
         help=(
-            "Marker engine. Default 'scvi' uses model.differential_expression(); "
-            "'scanpy' preserves the old Wilcoxon workflow; 'both' writes separate "
+            "Marker engine. Default 'scanpy' uses Wilcoxon markers. Use 'scvi' "
+            "explicitly for model.differential_expression(); 'both' writes separate "
             "scVI and Scanpy marker folders under --outdir."
         ),
     )
@@ -911,8 +914,8 @@ def plot_marker_filter_summary(summary, groupby, outdir, max_markers_per_cluster
     plot_df = summary.copy()
     plot_df["group"] = plot_df["group"].astype(str)
 
-    fig_width = max(9, 0.38 * len(plot_df) + 3)
-    fig, ax = plt.subplots(figsize=(fig_width, 4.8))
+    fig_width = max(11, 0.5 * len(plot_df) + 3.5)
+    fig, ax = plt.subplots(figsize=(fig_width, 6.0))
     x = np.arange(len(plot_df))
     width = 0.38
     up_bars = ax.bar(
@@ -950,10 +953,10 @@ def plot_marker_filter_summary(summary, groupby, outdir, max_markers_per_cluster
         label=f"Cap per direction = {max_markers_per_cluster}",
     )
     ax.set_xticks(list(x))
-    ax.set_xticklabels(plot_df["group"], rotation=0, fontsize=8)
+    ax.set_xticklabels(plot_df["group"], rotation=0, fontsize=11)
     ax.set_xlabel("Leiden cluster")
     ax.set_ylabel("Selected marker genes")
-    ax.set_title("Filtered marker genes selected per cluster", fontsize=12, fontweight="bold")
+    ax.set_title("Filtered marker genes selected per cluster", fontsize=16, fontweight="bold")
     ax.set_ylim(0, max_markers_per_cluster + max(2, int(max_markers_per_cluster * 0.08)))
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color="#d8d8d8", linewidth=0.6, alpha=0.8)
@@ -966,7 +969,7 @@ def plot_marker_filter_summary(summary, groupby, outdir, max_markers_per_cluster
         ["Positive markers", "Negative markers", "Capped at max"],
         frameon=False,
         loc="upper right",
-        fontsize=8,
+        fontsize=LEGEND_FONT_SIZE,
     )
     for bars, values in [
         (up_bars, plot_df["n_up_selected_markers"]),
@@ -981,9 +984,11 @@ def plot_marker_filter_summary(summary, groupby, outdir, max_markers_per_cluster
                 str(int(value)),
                 ha="center",
                 va="bottom",
-                fontsize=7,
+                fontsize=10,
             )
 
+    style_axis(ax, tick_size=11)
+    style_all_legends(fig)
     plt.tight_layout()
     png = os.path.join(outdir, f"{groupby}_filtered_marker_selection_counts.png")
     fig.savefig(png, dpi=300, bbox_inches="tight")

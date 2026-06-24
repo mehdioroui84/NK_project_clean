@@ -14,7 +14,19 @@ import scanpy as sc
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from configs import default_config as cfg
+from nk_project.evaluation.scanvi_full_plots import PREFERRED_STATE_COLORS
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    SMALL_TICK_LABEL_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_axis,
+    style_figure,
+    style_legend,
+)
+
+set_presentation_style()
 
 
 GROUPBY = "leiden_0_4"
@@ -73,7 +85,7 @@ NK_EXCLUDED_SCORE_MARKERS = [
 
 def main():
     args = parse_args()
-    in_path = os.path.join(cfg.BASE_OUTDIR, "leiden_discovery", "full_scvi_leiden.h5ad")
+    in_path = args.input_h5ad or os.path.join(cfg.BASE_OUTDIR, "leiden_discovery", "full_scvi_leiden.h5ad")
     outdir = args.outdir or os.path.join(cfg.BASE_OUTDIR, OUTDIR_NAME)
     figdir = os.path.join(outdir, "figures")
     ensure_dirs(outdir, figdir)
@@ -94,11 +106,11 @@ def main():
     apply_labels(adata, label_mapping, label_source=label_source, free_label_mapping=free_label_mapping)
     write_outputs(adata, outdir, label_mapping)
     plot_refined_umap(adata, figdir)
-    plot_annotation_qc_umap(adata, figdir)
+    plot_annotation_qc_umap(adata, figdir, panel9_min_cells=args.panel9_min_cells)
     if args.make_3d_umap:
         xyz = get_umap3d(adata, args, outdir)
         plot_refined_umap_3d(adata, figdir, xyz)
-        plot_annotation_qc_umap_3d(adata, figdir, xyz)
+        plot_annotation_qc_umap_3d(adata, figdir, xyz, panel9_min_cells=args.panel9_min_cells)
     print("[DONE] Full-data refined v1 label application complete.")
 
 
@@ -107,6 +119,14 @@ def parse_args():
         description=(
             "Apply annotation-agent labels to full-data Leiden clusters."
         )
+    )
+    parser.add_argument(
+        "--input-h5ad",
+        default=None,
+        help=(
+            "Input AnnData with Leiden clusters and X_umap. Default: "
+            "outputs/leiden_discovery/full_scvi_leiden.h5ad."
+        ),
     )
     parser.add_argument(
         "--mapping-csv",
@@ -155,6 +175,15 @@ def parse_args():
         "--recompute-3d-umap",
         action="store_true",
         help="Ignore cached 3D UMAP coordinates and recompute them.",
+    )
+    parser.add_argument(
+        "--panel9-min-cells",
+        type=int,
+        default=0,
+        help=(
+            "Hide clusters with fewer than this many cells from panel 9 "
+            "(cluster-level NK vs exclusion marker score scatter). Default 0 shows all clusters."
+        ),
     )
     return parser.parse_args()
 
@@ -265,8 +294,8 @@ def plot_refined_umap(adata, figdir):
         (cfg.REFINED_LABEL_KEY, f"2. final annotation: {cfg.REFINED_LABEL_KEY}", True, False),
     ]
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
-    fig.suptitle("Full-data SCVI latent space: annotation labels", fontsize=15)
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    fig.suptitle("Full-data SCVI latent space: annotation labels", fontsize=20, fontweight="bold")
     for ax, (obs_key, title, show_legend, annotate) in zip(axes, panels):
         scatter_categorical(
             ax,
@@ -279,6 +308,8 @@ def plot_refined_umap(adata, figdir):
 
     plt.tight_layout()
     png = os.path.join(figdir, "full_refined_v1_umap.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)
@@ -339,8 +370,8 @@ def plot_refined_umap_3d(adata, figdir, xyz):
         (cfg.REFINED_LABEL_KEY, f"2. final annotation: {cfg.REFINED_LABEL_KEY}", True, False),
     ]
 
-    fig = plt.figure(figsize=(16, 7))
-    fig.suptitle("Full-data SCVI latent space: annotation labels, 3D UMAP", fontsize=15)
+    fig = plt.figure(figsize=(20, 8))
+    fig.suptitle("Full-data SCVI latent space: annotation labels, 3D UMAP", fontsize=20, fontweight="bold")
     axes = [fig.add_subplot(1, 2, idx + 1, projection="3d") for idx in range(2)]
     for ax, (obs_key, title, show_legend, annotate) in zip(axes, panels):
         scatter_categorical_3d(
@@ -354,12 +385,14 @@ def plot_refined_umap_3d(adata, figdir, xyz):
 
     plt.tight_layout()
     png = os.path.join(figdir, "full_refined_v1_umap_3d.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)
 
 
-def plot_annotation_qc_umap(adata, figdir):
+def plot_annotation_qc_umap(adata, figdir, *, panel9_min_cells=0):
     xy = adata.obsm["X_umap"]
     positive_score, positive_used, positive_missing = marker_mean_score(adata, PAN_NK_SCORE_MARKERS)
     excluded_score, excluded_used, excluded_missing = marker_mean_score(adata, NK_EXCLUDED_SCORE_MARKERS)
@@ -393,10 +426,15 @@ def plot_annotation_qc_umap(adata, figdir):
     refined_values = adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values
     leiden_values = adata.obs[GROUPBY].astype(str).values
     refined_label_order = label_order_by_cluster(refined_values, leiden_values)
-    refined_label_colors = label_colors_from_cluster_colors(refined_label_order, refined_values, leiden_values)
-    fig, axes = plt.subplots(3, 3, figsize=(24, 22))
+    refined_label_colors = label_colors_from_cluster_colors(
+        refined_label_order,
+        refined_values,
+        leiden_values,
+        preferred=PREFERRED_STATE_COLORS,
+    )
+    fig, axes = plt.subplots(3, 3, figsize=(30, 26))
     axes = axes.ravel()
-    fig.suptitle("Annotation QC: cluster labels, metadata, and NK marker scores", fontsize=15)
+    fig.suptitle("Annotation QC: cluster labels, metadata, and NK marker scores", fontsize=20, fontweight="bold")
 
     scatter_categorical(
         axes[0],
@@ -465,16 +503,24 @@ def plot_annotation_qc_umap(adata, figdir):
         cmap="Blues",
         robust=True,
     )
-    plot_cluster_marker_agreement(axes[8], adata, positive_score, excluded_score)
+    plot_cluster_marker_agreement(
+        axes[8],
+        adata,
+        positive_score,
+        excluded_score,
+        min_cells=panel9_min_cells,
+    )
 
     plt.tight_layout()
     png = os.path.join(figdir, "annotation_umap_review_panels.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)
 
 
-def plot_annotation_qc_umap_3d(adata, figdir, xyz):
+def plot_annotation_qc_umap_3d(adata, figdir, xyz, *, panel9_min_cells=0):
     positive_score, positive_used, _ = marker_mean_score(adata, PAN_NK_SCORE_MARKERS)
     excluded_score, excluded_used, _ = marker_mean_score(adata, NK_EXCLUDED_SCORE_MARKERS)
     tissue = obs_values(adata, "tissue")
@@ -484,10 +530,15 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
     refined_values = adata.obs[cfg.REFINED_LABEL_KEY].astype(str).values
     leiden_values = adata.obs[GROUPBY].astype(str).values
     refined_label_order = label_order_by_cluster(refined_values, leiden_values)
-    refined_label_colors = label_colors_from_cluster_colors(refined_label_order, refined_values, leiden_values)
+    refined_label_colors = label_colors_from_cluster_colors(
+        refined_label_order,
+        refined_values,
+        leiden_values,
+        preferred=PREFERRED_STATE_COLORS,
+    )
 
-    fig = plt.figure(figsize=(24, 22))
-    fig.suptitle("Annotation QC: 3D UMAP labels, metadata, and NK marker scores", fontsize=15)
+    fig = plt.figure(figsize=(30, 26))
+    fig.suptitle("Annotation QC: 3D UMAP labels, metadata, and NK marker scores", fontsize=20, fontweight="bold")
     axes = [fig.add_subplot(3, 3, idx + 1, projection="3d") for idx in range(8)]
     axes.append(fig.add_subplot(3, 3, 9))
 
@@ -537,10 +588,18 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz):
         cmap="Blues",
         robust=True,
     )
-    plot_cluster_marker_agreement(axes[8], adata, positive_score, excluded_score)
+    plot_cluster_marker_agreement(
+        axes[8],
+        adata,
+        positive_score,
+        excluded_score,
+        min_cells=panel9_min_cells,
+    )
 
     plt.tight_layout()
     png = os.path.join(figdir, "annotation_umap_review_panels_3d.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)
@@ -579,7 +638,7 @@ def zscore(values):
     return (values - mean) / std
 
 
-def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score):
+def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score, *, min_cells=0):
     obs = pd.DataFrame(
         {
             GROUPBY: adata.obs[GROUPBY].astype(str).values,
@@ -599,6 +658,16 @@ def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score):
         .reset_index()
     )
     cluster = cluster.sort_values(GROUPBY, key=lambda s: s.map(cluster_sort_key))
+    n_before = len(cluster)
+    if min_cells and min_cells > 0:
+        hidden = cluster.loc[cluster["n_cells"] < min_cells, GROUPBY].astype(str).tolist()
+        if hidden:
+            print(f"[PANEL9] Hiding clusters with n_cells < {min_cells}: {', '.join(hidden)}")
+        cluster = cluster.loc[cluster["n_cells"] >= min_cells].copy()
+        if cluster.empty:
+            raise ValueError(
+                f"Panel 9 filter removed all clusters; lower --panel9-min-cells below {min_cells}."
+            )
     colors = category_colors(cluster["label"].tolist())
     sizes = 28 + 120 * np.sqrt(cluster["n_cells"] / cluster["n_cells"].max())
 
@@ -618,7 +687,7 @@ def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score):
             str(row[GROUPBY]),
             ha="center",
             va="center",
-            fontsize=6,
+            fontsize=9,
             color="#222222",
             weight="bold",
         )
@@ -626,12 +695,15 @@ def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score):
     ax.axvline(0, color="#bbbbbb", linewidth=0.8, zorder=0)
     ax.axhline(0, color="#bbbbbb", linewidth=0.8, zorder=0)
     ax.grid(True, color="#e2e2e2", linewidth=0.6, alpha=0.8)
-    ax.set_title("9. Cluster-level NK vs exclusion marker scores")
+    title = "9. Cluster-level NK vs exclusion marker scores"
+    if min_cells and min_cells > 0 and len(cluster) < n_before:
+        title += f" (n>={min_cells})"
+    ax.set_title(title)
     ax.set_xlabel("Mean standardized positive NK score")
     ax.set_ylabel("Mean standardized NK-excluded score")
     set_padded_limits(ax, cluster["positive_score"], axis="x")
     set_padded_limits(ax, cluster["excluded_score"], axis="y")
-    ax.tick_params(labelsize=7)
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
 
 
 def set_padded_limits(ax, values, *, axis: str):
@@ -694,7 +766,7 @@ def scatter_continuous(
         rasterized=True,
         linewidths=0,
     )
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlabel("")
@@ -778,7 +850,7 @@ def scatter_categorical(
             label=category,
         )
 
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlabel("")
@@ -798,7 +870,7 @@ def scatter_categorical(
             [0],
             marker="o",
             linestyle="",
-            markersize=8,
+            markersize=10,
             markerfacecolor=colors[category],
             markeredgecolor="none",
             alpha=1.0,
@@ -809,11 +881,12 @@ def scatter_categorical(
     ax.legend(
         handles=handles,
         frameon=False,
-        fontsize=7,
+        fontsize=LEGEND_FONT_SIZE,
         loc="upper left",
         bbox_to_anchor=(1.02, 1.0),
         handletextpad=0.4,
     )
+    style_legend(ax.get_legend())
 
 
 def scatter_categorical_3d(
@@ -857,7 +930,7 @@ def scatter_categorical_3d(
             [0],
             marker="o",
             linestyle="",
-            markersize=8,
+            markersize=10,
             markerfacecolor=colors[category],
             markeredgecolor="none",
             alpha=1.0,
@@ -868,11 +941,12 @@ def scatter_categorical_3d(
     ax.legend(
         handles=handles,
         frameon=False,
-        fontsize=7,
+        fontsize=LEGEND_FONT_SIZE,
         loc="upper left",
         bbox_to_anchor=(1.02, 1.0),
         handletextpad=0.4,
     )
+    style_legend(ax.get_legend())
 
 
 def short_legend_label(label: str, *, max_chars: int = MAX_LEGEND_LABEL_CHARS) -> str:
@@ -907,7 +981,8 @@ def label_order_by_cluster(labels, clusters):
     return [label for _, label in rows]
 
 
-def label_colors_from_cluster_colors(label_order, labels, clusters):
+def label_colors_from_cluster_colors(label_order, labels, clusters, *, preferred=None):
+    preferred = preferred or {}
     label_to_cluster = {}
     frame = pd.DataFrame(
         {
@@ -922,17 +997,17 @@ def label_colors_from_cluster_colors(label_order, labels, clusters):
         label_to_cluster[str(label)] = sub.value_counts().index[0]
     cluster_colors = category_colors(sorted(set(clusters), key=category_sort_key))
     return {
-        label: cluster_colors.get(cluster, "#999999")
+        label: preferred.get(label, cluster_colors.get(cluster, "#999999"))
         for label, cluster in label_to_cluster.items()
     }
 
 
 def format_3d_axis(ax, title, xyz):
-    ax.set_title(title)
+    ax.set_title(title, fontsize=13, fontweight="bold")
     ax.set_xlabel("UMAP1", labelpad=2)
     ax.set_ylabel("UMAP2", labelpad=2)
     ax.set_zlabel("UMAP3", labelpad=2)
-    ax.tick_params(axis="both", which="major", labelsize=6, length=2, pad=-2, colors="#666666")
+    ax.tick_params(axis="both", which="major", labelsize=9, length=2, pad=-2, colors="#666666")
     ax.set_proj_type("persp", focal_length=0.9)
     ax.view_init(elev=24, azim=-42)
     set_equal_3d_limits(ax, xyz)
@@ -977,7 +1052,7 @@ def annotate_category_centers(ax, xy, values):
             category,
             ha="center",
             va="center",
-            fontsize=7,
+            fontsize=10,
             color="#2b2b2b",
             weight="bold",
             bbox={
@@ -1003,7 +1078,7 @@ def annotate_category_centers_3d(ax, xyz, values):
             category,
             ha="center",
             va="center",
-            fontsize=7,
+            fontsize=10,
             color="#2b2b2b",
             weight="bold",
         )
@@ -1104,6 +1179,9 @@ def category_colors(categories):
         "23": "#BC80BD",
         "24": "#8C6D31",
     }
+    # Keep refined-label colors synchronized with SCANVI and annotation-flow
+    # plots. Numeric Leiden colors above are intentionally preserved.
+    preferred.update(PREFERRED_STATE_COLORS)
     palette = [
         "#0072B2",
         "#D55E00",

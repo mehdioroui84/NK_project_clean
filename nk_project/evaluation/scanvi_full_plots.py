@@ -16,6 +16,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from configs import default_config as cfg
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    SMALL_TICK_LABEL_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_figure,
+    style_legend,
+)
+
+set_presentation_style()
 
 
 PREFERRED_STATE_COLORS = {
@@ -49,10 +59,12 @@ PREFERRED_STATE_COLORS = {
     # scripts/04_apply_refined_v1_labels.py so annotation QC and SCANVI plots
     # tell the same visual story.
     "L6_Developmental_immature_Proliferating": "#E7298A",
+    "L6_Developmental_immature_Metabolic_stress_hypoxia": "#7F3C8D",
     "L6_Developmental_immature": "#E7298A",
     "NK1_Chemokine_inflammatory": "#0072B2",
     "NK1_Cytotoxic_activated": "#D55E00",
     "NK1_Checkpoint_exhausted": "#7570B3",
+    "NK1_Metabolic_stress_hypoxia": "#11A579",
     "NK1_Proliferating": "#80B1D3",
     "NK2_Chemokine_inflammatory": "#33A02C",
     "NK2_CIMP_cytokine_primed_memory_like": "#F0E442",
@@ -91,7 +103,7 @@ UMAP_POINT_SIZE = 0.08
 UMAP_POINT_ALPHA = 0.40
 CONTINUOUS_POINT_SIZE = 0.08
 CONTINUOUS_POINT_ALPHA = 1.00
-LEGEND_MARKER_SIZE = 7
+LEGEND_MARKER_SIZE = 10
 
 
 def distinct_color_map(values, preferred=None):
@@ -134,7 +146,7 @@ def scatter_by_category(ax, xy, values, color_map, *, size=UMAP_POINT_SIZE, alph
             rasterized=True,
         )
     clean_ax(ax)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     if legend:
         handles = [
             Line2D(
@@ -155,9 +167,10 @@ def scatter_by_category(ax, xy, values, color_map, *, size=UMAP_POINT_SIZE, alph
             frameon=False,
             loc="upper left",
             bbox_to_anchor=(1.02, 1.0),
-            fontsize=8,
+            fontsize=LEGEND_FONT_SIZE,
             handletextpad=0.4,
         )
+        style_legend(ax.get_legend())
 
 
 def clean_ax(ax):
@@ -282,9 +295,9 @@ def main(argv: list[str] | None = None):
     dataset_p = dataset[plot_idx]
     assay_p = assay[plot_idx]
 
-    fig, axes = plt.subplots(3, 3, figsize=(26, 18))
-    fig.subplots_adjust(left=0.04, right=0.78, top=0.94, bottom=0.06, wspace=0.35, hspace=0.35)
-    fig.suptitle(f"SCANVI assay_clean model: {panel_label} UMAP", fontsize=14)
+    fig, axes = plt.subplots(3, 3, figsize=(30, 21))
+    fig.subplots_adjust(left=0.04, right=0.76, top=0.94, bottom=0.07, wspace=0.4, hspace=0.38)
+    fig.suptitle(f"SCANVI assay_clean model: {panel_label} UMAP", fontsize=20, fontweight="bold")
 
     scatter_by_category(axes[0, 0], xy_p, true_p, class_colors, legend=True, title="1.1 TRUE NK_State")
     scatter_by_category(axes[0, 1], xy_p, pred_p, class_colors, legend=False, title="1.2 PRED NK_State")
@@ -338,7 +351,7 @@ def main(argv: list[str] | None = None):
         ],
         frameon=False,
         loc="upper left",
-        fontsize=8,
+        fontsize=LEGEND_FONT_SIZE,
     )
 
     ax = axes[1, 0]
@@ -392,10 +405,10 @@ def main(argv: list[str] | None = None):
     ax.bar(x - width / 2, class_metrics["accuracy"].values, width=width, color=bar_colors, alpha=0.9, label="Accuracy")
     ax.bar(x + width / 2, class_metrics["f1"].values, width=width, color=bar_colors, alpha=0.45, label="F1")
     ax.set_xticks(x)
-    ax.set_xticklabels(class_metrics.index, rotation=60, ha="right", fontsize=8)
+    ax.set_xticklabels(class_metrics.index, rotation=60, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
     ax.set_ylim(0, 1.05)
     ax.set_title(f"2.3 Per-class {panel_label} Accuracy & F1")
-    ax.legend(frameon=False, loc="upper right", fontsize=8)
+    ax.legend(frameon=False, loc="upper right", fontsize=LEGEND_FONT_SIZE)
     class_metrics.to_csv(os.path.join(cfg.TABLE_OUTDIR, f"scanvi_{file_suffix}_per_class_accuracy_f1.csv"))
 
     scatter_by_category(
@@ -424,6 +437,8 @@ def main(argv: list[str] | None = None):
     )
 
     png = os.path.join(cfg.FIG_OUTDIR, f"scanvi_{file_suffix}_umap_panels.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)

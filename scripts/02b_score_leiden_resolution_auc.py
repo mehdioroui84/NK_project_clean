@@ -25,6 +25,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from configs import default_config as cfg
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import LEGEND_FONT_SIZE, set_presentation_style, style_all_legends, style_figure, style_legend
+
+set_presentation_style()
 
 
 DEFAULT_RESOLUTIONS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0]
@@ -286,7 +289,7 @@ def choose_recommended_resolution(summary):
 
 
 def plot_auc_summary(summary, recommended_resolution, outdir):
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     axes = axes.ravel()
     x = summary["resolution"].astype(float)
 
@@ -301,7 +304,7 @@ def plot_auc_summary(summary, recommended_resolution, outdir):
     axes[1].set_title("Marker separability")
     axes[1].set_xlabel("Resolution")
     axes[1].set_ylabel("Median cluster AUC strength")
-    axes[1].legend(frameon=False, fontsize=8)
+    axes[1].legend(frameon=False, fontsize=LEGEND_FONT_SIZE)
 
     axes[2].plot(x, summary["pct_clusters_with_min_good_markers"], marker="o", color="#CC79A7")
     axes[2].set_title("Clusters with enough high-AUC markers")
@@ -320,8 +323,11 @@ def plot_auc_summary(summary, recommended_resolution, outdir):
 
     fig.suptitle(
         f"Exploratory Leiden resolution AUC QC: recommended {recommended_resolution:g}",
-        fontsize=14,
+        fontsize=20,
+        fontweight="bold",
     )
+    style_figure(fig, tick_size=11, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     plt.tight_layout()
     path = os.path.join(outdir, "leiden_resolution_auc_summary.png")
     fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
@@ -401,7 +407,7 @@ def summarize_cluster_count(cluster_table, method, n_requested_clusters, args):
 
 
 def plot_cluster_count_benchmark(summary, outdir):
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     axes = axes.ravel()
     x = summary["n_requested_clusters"].astype(int)
 
@@ -410,7 +416,7 @@ def plot_cluster_count_benchmark(summary, outdir):
     axes[0].set_title("Recovered KMeans clusters")
     axes[0].set_xlabel("Requested cluster count")
     axes[0].set_ylabel("n non-empty clusters")
-    axes[0].legend(frameon=False, fontsize=8)
+    axes[0].legend(frameon=False, fontsize=LEGEND_FONT_SIZE)
 
     axes[1].plot(x, summary["median_top50_positive_auc"], marker="o", label="top50 positive AUC", color="#D55E00")
     axes[1].plot(x, summary["median_top50_negative_auc_strength"], marker="o", label="top50 negative strength", color="#0072B2")
@@ -418,7 +424,7 @@ def plot_cluster_count_benchmark(summary, outdir):
     axes[1].set_title("Marker separability")
     axes[1].set_xlabel("Requested cluster count")
     axes[1].set_ylabel("Median cluster AUC strength")
-    axes[1].legend(frameon=False, fontsize=8)
+    axes[1].legend(frameon=False, fontsize=LEGEND_FONT_SIZE)
 
     axes[2].plot(x, summary["pct_clusters_with_min_good_markers"], marker="o", color="#CC79A7")
     axes[2].set_title("Clusters with enough high-AUC markers")
@@ -435,7 +441,9 @@ def plot_cluster_count_benchmark(summary, outdir):
         ax.axvline(25, color="#333333", linestyle="--", linewidth=1)
         ax.grid(True, color="#dddddd", linewidth=0.6, alpha=0.8)
 
-    fig.suptitle("Exploratory MiniBatchKMeans cluster-count AUC QC: k=10..30", fontsize=14)
+    fig.suptitle("Exploratory MiniBatchKMeans cluster-count AUC QC: k=10..30", fontsize=20, fontweight="bold")
+    style_figure(fig, tick_size=11, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     plt.tight_layout()
     path = os.path.join(outdir, "kmeans_cluster_count_auc_summary.png")
     fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
@@ -464,17 +472,18 @@ def scatter_categorical(ax, xy, values, title):
             str(category),
             ha="center",
             va="center",
-            fontsize=8,
+            fontsize=10,
             weight="bold",
             color="#222222",
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.55, "pad": 1.0},
         )
     handles = [
-        Line2D([0], [0], marker="o", linestyle="", markerfacecolor=colors[c], markeredgecolor="none", markersize=5, label=str(c))
+        Line2D([0], [0], marker="o", linestyle="", markerfacecolor=colors[c], markeredgecolor="none", markersize=10, label=str(c))
         for c in categories
     ]
-    ax.legend(handles=handles, frameon=False, fontsize=7, loc="upper left", bbox_to_anchor=(1.02, 1.0))
-    ax.set_title(title)
+    ax.legend(handles=handles, frameon=False, fontsize=LEGEND_FONT_SIZE, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+    style_legend(ax.get_legend())
+    ax.set_title(title, fontsize=16, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_aspect("equal", adjustable="datalim")

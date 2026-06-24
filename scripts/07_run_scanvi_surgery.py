@@ -17,7 +17,10 @@ from configs import default_config as cfg
 from nk_project.evaluate import probability_summary
 from nk_project.io_utils import ensure_dirs, save_latent_npz, save_run_config
 from nk_project.metrics import filtered_classification_metrics
+from nk_project.plot_style import LEGEND_FONT_SIZE, set_presentation_style, style_all_legends, style_axis, style_figure
 from nk_project.workflows import prepare_filtered_data
+
+set_presentation_style()
 
 
 DEFAULT_REF_OUTDIR_NAME = "refined_scanvi_v1"
@@ -413,7 +416,7 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
         "zero_shot_same_query": "Zero-shot",
         "surgery": "Surgery",
     }
-    fig, ax = plt.subplots(figsize=(5.8, 3.6))
+    fig, ax = plt.subplots(figsize=(7.0, 4.5))
     x = np.arange(len(comparison))
     width = 0.34
     ax.bar(x - width / 2, comparison["macro_f1"], width, label="Macro F1", color="#4c78a8")
@@ -425,10 +428,12 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
     )
     ax.set_ylim(0, 1)
     ax.set_ylabel("F1")
-    ax.set_title("Held-out refined-v1 prediction: zero-shot vs surgery")
-    ax.legend(frameon=False)
+    ax.set_title("Held-out refined-v1 prediction: zero-shot vs surgery", fontsize=16, fontweight="bold")
+    ax.legend(frameon=False, fontsize=LEGEND_FONT_SIZE)
     for container in ax.containers:
-        ax.bar_label(container, fmt="%.3f", fontsize=8, padding=2)
+        ax.bar_label(container, fmt="%.3f", fontsize=10, padding=2)
+    style_axis(ax, tick_size=11)
+    style_all_legends(fig)
     fig.tight_layout()
     fig.savefig(
         os.path.join(run_cfg.FIG_OUTDIR, "scanvi_surgery_vs_zeroshot_summary.png"),
@@ -446,7 +451,7 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
         return
     pc = pc.sort_values("zero_shot_f1", ascending=True)
     fig_h = max(4.5, 0.35 * len(pc))
-    fig, ax = plt.subplots(figsize=(7.5, fig_h))
+    fig, ax = plt.subplots(figsize=(9.5, fig_h))
     y = np.arange(len(pc))
     ax.barh(y - 0.18, pc["zero_shot_f1"], height=0.34, label="Zero-shot", color="#9ecae9")
     ax.barh(y + 0.18, pc["surgery_f1"], height=0.34, label="Surgery", color="#31a354")
@@ -454,8 +459,10 @@ def plot_comparison(run_cfg, comparison: pd.DataFrame):
     ax.set_yticklabels(pc.index)
     ax.set_xlim(0, 1)
     ax.set_xlabel("F1")
-    ax.set_title("Held-out per-class F1")
-    ax.legend(frameon=False, loc="lower right")
+    ax.set_title("Held-out per-class F1", fontsize=16, fontweight="bold")
+    ax.legend(frameon=False, loc="lower right", fontsize=LEGEND_FONT_SIZE)
+    style_figure(fig, tick_size=11, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.tight_layout()
     fig.savefig(
         os.path.join(run_cfg.FIG_OUTDIR, "scanvi_surgery_vs_zeroshot_per_class_f1.png"),

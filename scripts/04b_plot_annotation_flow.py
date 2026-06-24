@@ -21,6 +21,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from configs import default_config as cfg
 from nk_project.evaluation.scanvi_full_plots import PREFERRED_STATE_COLORS
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_figure,
+    style_legend,
+)
+
+set_presentation_style()
 
 
 DEFAULT_GREY_PATTERNS = [
@@ -35,6 +44,19 @@ DEFAULT_GREY_PATTERNS = [
 POINT_SIZE = 0.06
 POINT_ALPHA = 0.38
 GREY = "#8a8a8a"
+DEFAULT_MAX_LEGEND_LABEL_CHARS = 34
+
+LEGEND_LABEL_REPLACEMENTS = {
+    "Developmental": "Dev",
+    "developmental": "dev",
+    "immature": "imm.",
+    "Metabolic_stress_hypoxia": "Metabolic_hypoxia",
+    "Chemokine_inflammatory": "Chemokine_infl.",
+    "Cytotoxic_activated": "Cytotoxic_act.",
+    "cytokine_primed_memory_like": "CIMP_memory",
+    "Homeostatic_quiescent": "Homeostatic",
+    "Proliferating": "Prolif.",
+}
 
 
 def main() -> None:
@@ -47,7 +69,7 @@ def main() -> None:
     missing = [key for key in required if key not in adata.obs]
     if missing:
         raise KeyError(f"Missing obs columns: {missing}")
-    if "X_umap" not in adata.obsm:
+    if not args.matrix_only and "X_umap" not in adata.obsm:
         raise KeyError("X_umap not found in adata.obsm")
 
     df = (
@@ -57,10 +79,27 @@ def main() -> None:
         .replace({"nan": "Unknown", "None": "Unknown", "": "Unknown"})
     )
     df.columns = ["left", "middle", "right"]
-    xy = np.asarray(adata.obsm["X_umap"])
+    xy = np.asarray(adata.obsm["X_umap"]) if "X_umap" in adata.obsm else None
 
     grey_patterns = [re.compile(pattern, flags=re.IGNORECASE) for pattern in args.grey_pattern]
     colors = build_shared_colors(df, grey_patterns)
+
+    if args.matrix_only:
+        plot_matrix_heatmaps(
+            df,
+            args.outdir,
+            args.prefix,
+            pair=args.matrix_pair,
+            left_title=args.left_title,
+            middle_title=args.middle_title,
+            right_title=args.right_title,
+            label_mode=args.matrix_label_mode,
+            color_scale=args.matrix_color_scale,
+            min_count_label=args.matrix_min_count_label,
+            min_row_pct_label=args.matrix_min_row_pct_label,
+        )
+        print("[DONE] Annotation matrix heatmap complete.")
+        return
 
     umap_path = os.path.join(args.outdir, f"{args.prefix}_umap_side_by_side.png")
     html_path = os.path.join(args.outdir, f"{args.prefix}_alluvial.html")
@@ -74,6 +113,7 @@ def main() -> None:
         left_title=args.left_title,
         middle_title=args.middle_title,
         right_title=args.right_title,
+        max_legend_label_chars=args.max_legend_label_chars,
     )
     plot_alluvial(
         df,
@@ -91,6 +131,20 @@ def main() -> None:
         middle_title=args.middle_title,
         right_title=args.right_title,
     )
+    if args.include_matrix:
+        plot_matrix_heatmaps(
+            df,
+            args.outdir,
+            args.prefix,
+            pair=args.matrix_pair,
+            left_title=args.left_title,
+            middle_title=args.middle_title,
+            right_title=args.right_title,
+            label_mode=args.matrix_label_mode,
+            color_scale=args.matrix_color_scale,
+            min_count_label=args.matrix_min_count_label,
+            min_row_pct_label=args.matrix_min_row_pct_label,
+        )
 
     print("[DONE] Annotation flow plots complete.")
 
@@ -118,12 +172,68 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--middle-title", default="Leiden clusters")
     parser.add_argument("--right-title", default="Agent annotation")
     parser.add_argument(
+        "--matrix-only",
+        action="store_true",
+        help="Only generate annotation count-matrix heatmap(s); skip UMAP and alluvial plots.",
+    )
+    parser.add_argument(
+        "--include-matrix",
+        action="store_true",
+        help="Also generate annotation count-matrix heatmap(s) alongside the UMAP/alluvial plots.",
+    )
+    parser.add_argument(
+        "--matrix-pair",
+        choices=["left-right", "left-middle", "middle-right", "all"],
+        default="left-right",
+        help=(
+            "Which mapping to summarize as a matrix. Default left-right is "
+            "manual annotation to agent annotation."
+        ),
+    )
+    parser.add_argument(
+        "--matrix-label-mode",
+        choices=["count", "row_pct", "both"],
+        default="both",
+        help="Cell labels inside the heatmap.",
+    )
+    parser.add_argument(
+        "--matrix-color-scale",
+        choices=["none", "log", "linear", "row_pct"],
+        default="none",
+        help=(
+            "Color scale for matrix cells. Default none makes a clean table-style "
+            "matrix with no color encoding. Use row_pct to color by row percentage "
+            "while keeping raw cell counts in labels."
+        ),
+    )
+    parser.add_argument(
+        "--matrix-min-count-label",
+        type=int,
+        default=1,
+        help="Only annotate matrix cells with at least this many cells.",
+    )
+    parser.add_argument(
+        "--matrix-min-row-pct-label",
+        type=float,
+        default=0.02,
+        help="Only annotate matrix cells with at least this row fraction.",
+    )
+    parser.add_argument(
         "--grey-pattern",
         action="append",
         default=DEFAULT_GREY_PATTERNS.copy(),
         help=(
             "Regex for labels that should be colored grey. Can be repeated. "
             "Defaults include B, T, Non-NK, myeloid, epithelial, stromal, erythroid."
+        ),
+    )
+    parser.add_argument(
+        "--max-legend-label-chars",
+        type=int,
+        default=DEFAULT_MAX_LEGEND_LABEL_CHARS,
+        help=(
+            "Maximum displayed legend label length after abbreviation. "
+            "Use 0 to disable truncation. Data labels are not changed."
         ),
     )
     return parser.parse_args()
@@ -175,12 +285,31 @@ def plot_umap_panels(
     left_title: str,
     middle_title: str,
     right_title: str,
+    max_legend_label_chars: int,
 ) -> None:
-    fig, axes = plt.subplots(1, 3, figsize=(24, 7))
-    fig.suptitle("Annotation labels and Leiden clusters", fontsize=14)
-    scatter_panel(axes[0], xy, df["left"].values, left_title, colors["left"], legend=True)
+    fig, axes = plt.subplots(1, 3, figsize=(30, 9))
+    fig.suptitle("Annotation labels and Leiden clusters", fontsize=20, fontweight="bold")
+    scatter_panel(
+        axes[0],
+        xy,
+        df["left"].values,
+        left_title,
+        colors["left"],
+        legend=True,
+        max_legend_label_chars=max_legend_label_chars,
+    )
     scatter_panel(axes[1], xy, df["middle"].values, middle_title, colors["middle"], legend=False, annotate=True)
-    scatter_panel(axes[2], xy, df["right"].values, right_title, colors["right"], legend=True)
+    scatter_panel(
+        axes[2],
+        xy,
+        df["right"].values,
+        right_title,
+        colors["right"],
+        legend=True,
+        max_legend_label_chars=max_legend_label_chars,
+    )
+    style_figure(fig, tick_size=10, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.tight_layout()
     fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -196,6 +325,7 @@ def scatter_panel(
     *,
     legend: bool = False,
     annotate: bool = False,
+    max_legend_label_chars: int = DEFAULT_MAX_LEGEND_LABEL_CHARS,
 ) -> None:
     values = np.asarray(values).astype(str)
     categories = sorted(set(values), key=category_sort_key)
@@ -212,7 +342,7 @@ def scatter_panel(
         )
     if annotate:
         annotate_centers(ax, xy, values)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=16, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlabel("")
@@ -226,14 +356,24 @@ def scatter_panel(
                 [0],
                 marker="o",
                 linestyle="",
-                markersize=6,
+                markersize=10,
                 markerfacecolor=colors.get(category, GREY),
                 markeredgecolor="none",
-                label=category,
+                label=shorten_legend_label(category, max_chars=max_legend_label_chars),
             )
             for category in categories
         ]
-        ax.legend(handles=handles, frameon=False, fontsize=6, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+        ax.legend(handles=handles, frameon=False, fontsize=LEGEND_FONT_SIZE, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+        style_legend(ax.get_legend())
+
+
+def shorten_legend_label(label: str, *, max_chars: int = DEFAULT_MAX_LEGEND_LABEL_CHARS) -> str:
+    display = str(label)
+    for old, new in LEGEND_LABEL_REPLACEMENTS.items():
+        display = display.replace(old, new)
+    if max_chars and max_chars > 3 and len(display) > max_chars:
+        return display[: max_chars - 3].rstrip("_- ") + "..."
+    return display
 
 
 def annotate_centers(ax, xy: np.ndarray, values) -> None:
@@ -249,11 +389,164 @@ def annotate_centers(ax, xy: np.ndarray, values) -> None:
             category,
             ha="center",
             va="center",
-            fontsize=7,
+            fontsize=10,
             weight="bold",
             color="black",
             bbox={"boxstyle": "round,pad=0.18", "facecolor": "white", "edgecolor": "none", "alpha": 0.35},
         )
+
+
+def plot_matrix_heatmaps(
+    df: pd.DataFrame,
+    outdir: str,
+    prefix: str,
+    *,
+    pair: str,
+    left_title: str,
+    middle_title: str,
+    right_title: str,
+    label_mode: str,
+    color_scale: str,
+    min_count_label: int,
+    min_row_pct_label: float,
+) -> None:
+    left_order, middle_order, right_order = ordered_layers(df)
+    pair_specs = {
+        "left-right": ("left", "right", left_order, right_order, left_title, right_title),
+        "left-middle": ("left", "middle", left_order, middle_order, left_title, middle_title),
+        "middle-right": ("middle", "right", middle_order, right_order, middle_title, right_title),
+    }
+    selected = list(pair_specs) if pair == "all" else [pair]
+    for pair_name in selected:
+        row_col, col_col, row_order, col_order, row_title, col_title = pair_specs[pair_name]
+        counts = count_matrix(df, row_col, col_col, row_order, col_order)
+        row_pct = counts.div(counts.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
+        count_path = os.path.join(outdir, f"{prefix}_matrix_{pair_name}_counts.csv")
+        row_pct_path = os.path.join(outdir, f"{prefix}_matrix_{pair_name}_row_pct.csv")
+        counts.to_csv(count_path)
+        row_pct.to_csv(row_pct_path)
+        print(f"[SAVE] {count_path}")
+        print(f"[SAVE] {row_pct_path}")
+
+        png = os.path.join(outdir, f"{prefix}_matrix_{pair_name}.png")
+        plot_count_matrix(
+            counts,
+            row_pct,
+            png,
+            row_title=row_title,
+            col_title=col_title,
+            label_mode=label_mode,
+            color_scale=color_scale,
+            min_count_label=min_count_label,
+            min_row_pct_label=min_row_pct_label,
+        )
+
+
+def count_matrix(
+    df: pd.DataFrame,
+    row_col: str,
+    col_col: str,
+    row_order: list[str],
+    col_order: list[str],
+) -> pd.DataFrame:
+    counts = pd.crosstab(df[row_col].astype(str), df[col_col].astype(str))
+    return counts.reindex(index=row_order, columns=col_order, fill_value=0).astype(int)
+
+
+def plot_count_matrix(
+    counts: pd.DataFrame,
+    row_pct: pd.DataFrame,
+    path: str,
+    *,
+    row_title: str,
+    col_title: str,
+    label_mode: str,
+    color_scale: str,
+    min_count_label: int,
+    min_row_pct_label: float,
+) -> None:
+    if counts.empty:
+        print(f"[WARN] Empty matrix for {row_title} -> {col_title}; skipping.")
+        return
+    values = counts.to_numpy(dtype=float)
+    use_color = color_scale != "none"
+    if color_scale == "log":
+        color_values = np.log10(values + 1.0)
+        cbar_label = "log10(cell count + 1)"
+        cmap = "Blues"
+        vmin = 0.0
+        vmax = max(float(np.nanmax(color_values)), 1.0)
+    elif color_scale == "linear":
+        color_values = values
+        cbar_label = "Cell count"
+        cmap = "Blues"
+        vmin = 0.0
+        vmax = max(float(np.nanmax(color_values)), 1.0)
+    elif color_scale == "row_pct":
+        color_values = row_pct.to_numpy(dtype=float)
+        cbar_label = f"Percent of {row_title} cells"
+        cmap = "Reds"
+        vmin = 0.0
+        vmax = 1.0
+    else:
+        color_values = np.zeros_like(values)
+        cbar_label = ""
+        cmap = "Blues"
+        vmin = 0.0
+        vmax = 1.0
+
+    n_rows, n_cols = counts.shape
+    fig_w = max(10, 0.5 * n_cols + 4)
+    fig_h = max(6, 0.42 * n_rows + 2)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    im = ax.imshow(color_values, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+    if not use_color:
+        ax.set_facecolor("white")
+        im.set_alpha(0.0)
+    ax.set_xticks(np.arange(n_cols))
+    ax.set_xticklabels(counts.columns, rotation=45, ha="right", fontsize=10)
+    ax.set_yticks(np.arange(n_rows))
+    ax.set_yticklabels(counts.index, fontsize=10)
+    ax.set_xlabel(col_title)
+    ax.set_ylabel(row_title)
+    if color_scale == "row_pct":
+        title = f"{row_title} -> {col_title}: row-percentage heatmap"
+    else:
+        title = f"{row_title} -> {col_title}: cell-count matrix"
+    ax.set_title(title, fontsize=16, fontweight="bold")
+    ax.set_xticks(np.arange(n_cols + 1) - 0.5, minor=True)
+    ax.set_yticks(np.arange(n_rows + 1) - 0.5, minor=True)
+    ax.grid(which="minor", color="#d8d8d8", linestyle="-", linewidth=0.8)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    vmax = float(np.nanmax(color_values)) if np.isfinite(color_values).any() else 0.0
+    for i, row_name in enumerate(counts.index):
+        for j, col_name in enumerate(counts.columns):
+            count = int(counts.loc[row_name, col_name])
+            pct = float(row_pct.loc[row_name, col_name])
+            if count < min_count_label or pct < min_row_pct_label:
+                continue
+            text = matrix_cell_label(count, pct, label_mode)
+            color_value = float(color_values[i, j])
+            text_color = "white" if use_color and vmax > 0 and color_value > 0.50 * vmax else "#17202a"
+            ax.text(j, i, text, ha="center", va="center", fontsize=8.5, fontweight="bold", color=text_color)
+
+    if use_color:
+        cbar = fig.colorbar(im, ax=ax, fraction=0.02, pad=0.02)
+        cbar.set_label(cbar_label, fontweight="bold")
+    style_figure(fig, tick_size=10, legend_size=LEGEND_FONT_SIZE)
+    fig.tight_layout()
+    fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"[SAVE] {path}")
+
+
+def matrix_cell_label(count: int, row_pct: float, label_mode: str) -> str:
+    if label_mode == "count":
+        return f"{count:,}"
+    if label_mode == "row_pct":
+        return f"{row_pct:.0%}"
+    return f"{count:,}\n{row_pct:.0%}"
 
 
 def plot_alluvial(

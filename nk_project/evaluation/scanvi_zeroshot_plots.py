@@ -15,6 +15,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from configs import default_config as cfg
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    SMALL_TICK_LABEL_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_figure,
+    style_legend,
+)
+
+set_presentation_style()
 
 
 OUTDIR_NAME = "refined_scanvi_v1"
@@ -22,7 +32,7 @@ SPLIT_VALUE = "Held-out"
 POINT_SIZE = 0.20
 POINT_ALPHA = 0.55
 CONTINUOUS_POINT_SIZE = 0.20
-LEGEND_MARKER_SIZE = 7
+LEGEND_MARKER_SIZE = 10
 
 
 PREFERRED_COLORS = {
@@ -175,10 +185,10 @@ def make_panel_plot(obs, xy, true, pred_label, confidence, certainty, correct, f
     assay = obs[cfg.ASSAY_CLEAN_KEY].astype(str).values if cfg.ASSAY_CLEAN_KEY in obs else np.array(["NA"] * len(obs))
     state_colors = distinct_color_map(np.r_[true, pred_label], preferred=PREFERRED_COLORS)
 
-    fig, axes = plt.subplots(3, 3, figsize=(26, 18))
-    fig.subplots_adjust(left=0.04, right=0.78, top=0.94, bottom=0.06, wspace=0.35, hspace=0.35)
+    fig, axes = plt.subplots(3, 3, figsize=(30, 21))
+    fig.subplots_adjust(left=0.04, right=0.76, top=0.94, bottom=0.07, wspace=0.4, hspace=0.38)
     err_rate = 1.0 - float(np.mean(correct))
-    fig.suptitle(f"Refined SCANVI zero-shot held-out UMAP (error={err_rate:.1%})", fontsize=14)
+    fig.suptitle(f"Refined SCANVI zero-shot held-out UMAP (error={err_rate:.1%})", fontsize=20, fontweight="bold")
 
     scatter_by_category(axes[0, 0], xy, true, state_colors, legend=True, title=f"1.1 TRUE {cfg.REFINED_LABEL_KEY}")
     scatter_by_category(axes[0, 1], xy, pred_label, state_colors, legend=False, title=f"1.2 PRED {cfg.REFINED_LABEL_KEY}")
@@ -195,7 +205,7 @@ def make_panel_plot(obs, xy, true, pred_label, confidence, certainty, correct, f
         ],
         frameon=False,
         loc="upper left",
-        fontsize=8,
+        fontsize=LEGEND_FONT_SIZE,
     )
 
     scatter_continuous(axes[1, 0], xy, confidence, fig, "2.1 Confidence")
@@ -214,6 +224,8 @@ def make_panel_plot(obs, xy, true, pred_label, confidence, certainty, correct, f
     scatter_by_category(axes[2, 2], xy, assay, distinct_color_map(assay), legend=True, title="3.3 Assay clean")
 
     png = os.path.join(figdir, "scanvi_zeroshot_umap_panels.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     print(f"[SAVE] {png}")
     plt.close(fig)
@@ -236,10 +248,11 @@ def plot_per_class_metrics(ax, true, pred_label, color_map, tabledir):
     ax.bar(x - width / 2, metrics["accuracy"].values, width=width, color=colors, alpha=0.9, label="Accuracy")
     ax.bar(x + width / 2, metrics["f1"].values, width=width, color=colors, alpha=0.45, label="F1")
     ax.set_xticks(x)
-    ax.set_xticklabels(metrics.index, rotation=60, ha="right", fontsize=8)
+    ax.set_xticklabels(metrics.index, rotation=60, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
     ax.set_ylim(0, 1.05)
     ax.set_title("2.3 Zero-shot per-class Accuracy & F1")
-    ax.legend(frameon=False, loc="upper right", fontsize=8)
+    ax.legend(frameon=False, loc="upper right", fontsize=LEGEND_FONT_SIZE)
+    style_legend(ax.get_legend())
     out = os.path.join(tabledir, "scanvi_zeroshot_per_class_accuracy_f1.csv")
     metrics.to_csv(out)
     print(f"[SAVE] {out}")
@@ -258,7 +271,7 @@ def scatter_continuous(ax, xy, values, fig, title):
         rasterized=True,
     )
     clean_ax(ax)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     fig.colorbar(sc_plot, ax=ax, fraction=0.046, pad=0.02)
 
 
@@ -276,7 +289,7 @@ def scatter_by_category(ax, xy, values, color_map, *, legend=False, title=""):
             rasterized=True,
         )
     clean_ax(ax)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14, fontweight="bold")
     if legend:
         handles = [
             Line2D(
@@ -297,9 +310,10 @@ def scatter_by_category(ax, xy, values, color_map, *, legend=False, title=""):
             frameon=False,
             loc="upper left",
             bbox_to_anchor=(1.02, 1.0),
-            fontsize=8,
+            fontsize=LEGEND_FONT_SIZE,
             handletextpad=0.4,
         )
+        style_legend(ax.get_legend())
 
 
 def clean_ax(ax):

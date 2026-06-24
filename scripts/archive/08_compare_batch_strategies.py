@@ -27,7 +27,10 @@ from nk_project.metrics import (
     compute_label_asw,
     subsample_for_metrics,
 )
+from nk_project.plot_style import SMALL_TICK_LABEL_SIZE, set_presentation_style, style_axis
 from nk_project.workflows import train_scanvi
+
+set_presentation_style()
 
 
 STRATEGIES = {
@@ -465,14 +468,14 @@ def plot_absolute_scores(summary, path, plot_cols):
     plot_df = summary[plot_cols].copy()
     labels = [PLOT_METRIC_LABELS[col] for col in plot_cols]
 
-    fig_width = max(7, 1.35 * len(plot_cols) + 3)
-    fig, ax = plt.subplots(figsize=(fig_width, max(3.4, 0.55 * len(plot_df) + 1.8)))
+    fig_width = max(9, 1.6 * len(plot_cols) + 3.5)
+    fig, ax = plt.subplots(figsize=(fig_width, max(4.5, 0.7 * len(plot_df) + 2.0)))
     im = ax.imshow(plot_df.values, aspect="auto", vmin=0, vmax=1, cmap="viridis")
     ax.set_xticks(np.arange(len(labels)))
-    ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=9)
+    ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
     ax.set_yticks(np.arange(len(plot_df.index)))
-    ax.set_yticklabels(plot_df.index, fontsize=10)
-    ax.set_title("Batch strategy comparison: direct metrics (0=bad, 1=good)")
+    ax.set_yticklabels(plot_df.index, fontsize=11)
+    ax.set_title("Batch strategy comparison: direct metrics (0=bad, 1=good)", fontsize=16, fontweight="bold")
 
     for i in range(plot_df.shape[0]):
         for j in range(plot_df.shape[1]):
@@ -484,11 +487,12 @@ def plot_absolute_scores(summary, path, plot_cols):
                 ha="center",
                 va="center",
                 color="white" if val < 0.55 else "black",
-                fontsize=8,
+                fontsize=10,
             )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
-    cbar.set_label("normalized score")
+    cbar.set_label("normalized score", fontweight="bold")
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
     plt.tight_layout()
     fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)

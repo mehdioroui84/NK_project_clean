@@ -61,3 +61,6 @@ __pycache__/
 *.temp
 *.bak
 debug/
+
+# Local assistant metadata
+.claude/

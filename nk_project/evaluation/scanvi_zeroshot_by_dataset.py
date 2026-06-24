@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from configs import default_config as cfg
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import LEGEND_FONT_SIZE, set_presentation_style, style_axis, style_all_legends
+
+set_presentation_style()
 
 
 DEFAULT_REF_OUTDIR_NAME = "refined_scanvi_v1"
@@ -211,15 +214,17 @@ def plot_summary(summary: pd.DataFrame, fig_dir: str, suffix: str):
     ]
     y = np.arange(len(plot_df))
     fig_h = max(4.5, 0.55 * len(plot_df))
-    fig, ax = plt.subplots(figsize=(9.5, fig_h))
+    fig, ax = plt.subplots(figsize=(11, fig_h))
     ax.barh(y - 0.18, plot_df["macro_f1"], height=0.34, label="Macro F1", color="#4c78a8")
     ax.barh(y + 0.18, plot_df["weighted_f1"], height=0.34, label="Weighted F1", color="#f58518")
     ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=8)
+    ax.set_yticklabels(labels, fontsize=10)
     ax.set_xlim(0, 1)
     ax.set_xlabel("F1")
-    ax.set_title("Refined-v1 SCANVI zero-shot performance by held-out dataset")
-    ax.legend(frameon=False, loc="lower right")
+    ax.set_title("Refined-v1 SCANVI zero-shot performance by held-out dataset", fontsize=16, fontweight="bold")
+    ax.legend(frameon=False, loc="lower right", fontsize=LEGEND_FONT_SIZE)
+    style_axis(ax, tick_size=10)
+    style_all_legends(fig)
     fig.tight_layout()
     png = os.path.join(fig_dir, f"scanvi_zeroshot_by_dataset_summary{suffix}.png")
     fig.savefig(png, dpi=180, bbox_inches="tight")

@@ -31,14 +31,17 @@ def main():
             "Run scripts/04_apply_refined_v1_labels.py first."
         )
 
-    run_cfg = make_run_config(outdir, refined_input, args.max_epochs)
+    run_cfg = make_run_config(outdir, refined_input, args.max_epochs, args.split_id_source_dir)
     ensure_dirs(run_cfg.BASE_OUTDIR, run_cfg.FIG_OUTDIR, run_cfg.MODEL_OUTDIR, run_cfg.TABLE_OUTDIR, run_cfg.LATENT_OUTDIR)
 
     print(f"[INPUT] {refined_input}")
     print(f"[OUTDIR] {outdir}")
     print(f"[LABEL] {run_cfg.REFINED_LABEL_KEY}")
     print(f"[BATCH] {run_cfg.PRODUCTION_BATCH_KEY}")
-    print(f"[SPLITS] Reusing split IDs from: {run_cfg.SPLIT_ID_SOURCE_DIR}")
+    if run_cfg.SPLIT_ID_SOURCE_DIR:
+        print(f"[SPLITS] Reusing split IDs from: {run_cfg.SPLIT_ID_SOURCE_DIR}")
+    else:
+        print("[SPLITS] Creating a fresh train/val/held-out split")
 
     if args.dry_run:
         print("[DRY-RUN] Configuration is valid; skipping SCANVI training.")
@@ -75,6 +78,14 @@ def parse_args():
         help="Override MAX_EPOCHS, useful for smoke tests.",
     )
     parser.add_argument(
+        "--split-id-source-dir",
+        default=None,
+        help=(
+            "Optional directory containing train_obs_names.txt, val_obs_names.txt, "
+            "and heldout_obs_names.txt to reuse. Default: create a fresh split."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate paths/configuration without training.",
@@ -82,9 +93,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def make_run_config(outdir: str, refined_input: str, max_epochs: int | None):
+def make_run_config(outdir: str, refined_input: str, max_epochs: int | None, split_id_source_dir: str | None = None):
     values = {name: getattr(cfg, name) for name in dir(cfg) if name.isupper()}
-    original_table_outdir = cfg.TABLE_OUTDIR
 
     values["BASE_OUTDIR"] = outdir
     values["FIG_OUTDIR"] = os.path.join(outdir, "figures")
@@ -92,7 +102,7 @@ def make_run_config(outdir: str, refined_input: str, max_epochs: int | None):
     values["TABLE_OUTDIR"] = os.path.join(outdir, "tables")
     values["LATENT_OUTDIR"] = os.path.join(outdir, "latents")
     values["MERGED_PATH"] = refined_input
-    values["SPLIT_ID_SOURCE_DIR"] = original_table_outdir
+    values["SPLIT_ID_SOURCE_DIR"] = split_id_source_dir
     if max_epochs is not None:
         values["MAX_EPOCHS"] = int(max_epochs)
     return SimpleNamespace(**values)

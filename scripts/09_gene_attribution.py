@@ -24,6 +24,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from configs import default_config as cfg
 from nk_project.annotation_agent.taxonomy_reference import load_taxonomy_entries
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    SMALL_TICK_LABEL_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_axis,
+    style_figure,
+)
+
+set_presentation_style()
 
 
 DEFAULT_REF_OUTDIR_NAME = "refined_scanvi_v1"
@@ -396,7 +406,7 @@ def parse_args() -> argparse.Namespace:
             "'free' preserves the older matplotlib autoscaling."
         ),
     )
-    parser.add_argument("--baseline", choices=["zero", "gene_mean"], default="zero")
+    parser.add_argument("--baseline", choices=["zero", "gene_mean", "gene_median"], default="zero")
     parser.add_argument(
         "--include-unseen-batches",
         action="store_true",
@@ -788,11 +798,48 @@ def choose_ig_method(args: argparse.Namespace) -> str:
 
 def make_baseline_vector(adata, args: argparse.Namespace) -> np.ndarray:
     if args.baseline == "zero":
+        print("[BASELINE] zero expression")
         return np.zeros(adata.n_vars, dtype=np.float32)
-    mean = adata.X.mean(axis=0)
-    if sparse.issparse(mean):
-        mean = mean.toarray()
-    return np.asarray(mean).ravel().astype(np.float32)
+    if args.baseline == "gene_mean":
+        print("[BASELINE] per-gene mean expression from aligned input cells")
+        mean = adata.X.mean(axis=0)
+        if sparse.issparse(mean):
+            mean = mean.toarray()
+        return np.asarray(mean).ravel().astype(np.float32)
+    if args.baseline == "gene_median":
+        print("[BASELINE] per-gene median expression from aligned input cells")
+        return sparse_aware_column_median(adata.X).astype(np.float32)
+    raise ValueError(f"Unsupported baseline mode: {args.baseline}")
+
+
+def sparse_aware_column_median(x) -> np.ndarray:
+    """Column medians without densifying the full cell x gene matrix.
+
+    AnnData expression matrices here are non-negative counts/log-normalized values.
+    For sparse input, implicit zeros are included in the median calculation.
+    """
+    if not sparse.issparse(x):
+        return np.asarray(np.median(np.asarray(x), axis=0)).ravel()
+
+    x_csc = x.tocsc()
+    n_obs, n_vars = x_csc.shape
+    k1 = (n_obs - 1) // 2
+    k2 = n_obs // 2
+    med = np.zeros(n_vars, dtype=np.float32)
+
+    for j in range(n_vars):
+        start, end = x_csc.indptr[j], x_csc.indptr[j + 1]
+        data = x_csc.data[start:end]
+        n_zero = n_obs - data.size
+
+        def value_at(k: int) -> float:
+            if k < n_zero:
+                return 0.0
+            return float(np.partition(data, k - n_zero)[k - n_zero])
+
+        med[j] = (value_at(k1) + value_at(k2)) / 2.0
+
+    return med
 
 
 def select_cells_for_state(obs: pd.DataFrame, proba: pd.DataFrame, state: str, args: argparse.Namespace) -> pd.DataFrame:
@@ -1044,7 +1091,7 @@ def plot_gene_selection_diagnostics(
     n_states = len(ranked_tables)
     n_cols = min(3, n_states)
     n_rows = ceil(n_states / n_cols)
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5.2 * n_cols, 3.8 * n_rows), squeeze=False)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6.1 * n_cols, 4.5 * n_rows), squeeze=False)
 
     for ax in axes.ravel():
         ax.axis("off")
@@ -1065,10 +1112,10 @@ def plot_gene_selection_diagnostics(
         if args.gene_selection == "relative_to_top":
             ax.axhline(threshold, color="#777777", linestyle=":", linewidth=1.0)
         ax.scatter([selected_n], [values[selected_n - 1]], color="#b23a48", s=18, zorder=3)
-        ax.set_title(f"{state}\nselected={selected_n}, mass={selected_mass:.2f}", fontsize=9, fontweight="bold")
-        ax.set_xlabel("Gene rank by mean |attribution|", fontsize=8)
-        ax.set_ylabel("Mean |attribution|", fontsize=8)
-        ax.tick_params(labelsize=7)
+        ax.set_title(f"{state}\nselected={selected_n}, mass={selected_mass:.2f}", fontsize=12, fontweight="bold")
+        ax.set_xlabel("Gene rank by mean |attribution|", fontsize=11, fontweight="bold")
+        ax.set_ylabel("Mean |attribution|", fontsize=11, fontweight="bold")
+        ax.tick_params(labelsize=10)
         ax.spines[["top", "right"]].set_visible(False)
 
         summary_rows.append(
@@ -1091,7 +1138,7 @@ def plot_gene_selection_diagnostics(
         )
     else:
         title = f"Attribution gene-selection diagnostic: top {args.top_n} genes per state"
-    fig.suptitle(title, fontsize=13, fontweight="bold")
+    fig.suptitle(title, fontsize=18, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     save_figure(fig, fig_dir, "gene_attribution_gene_selection_diagnostic")
 
@@ -1110,7 +1157,7 @@ def plot_bar_per_state(
     n_states = len(ranked_tables)
     n_cols = min(3, n_states)
     n_rows = ceil(n_states / n_cols)
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5.2 * n_cols, 4.2 * n_rows), squeeze=False)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6.4 * n_cols, 5.0 * n_rows), squeeze=False)
 
     shared_xlim = None
     if args.bar_x_scale == "shared":
@@ -1141,9 +1188,11 @@ def plot_bar_per_state(
                 bar.set_edgecolor(TAXONOMY_HIGHLIGHT_COLOR)
                 bar.set_linewidth(1.5)
         ax.axvline(0, color="#222222", linewidth=0.8)
-        ax.set_title(state, fontsize=10, fontweight="bold")
+        ax.set_title(state, fontsize=13, fontweight="bold")
         ax.set_xlabel("Mean Integrated Gradients attribution")
-        ax.tick_params(axis="y", labelsize=8)
+        ax.xaxis.label.set_fontsize(12)
+        ax.xaxis.label.set_fontweight("bold")
+        ax.tick_params(axis="both", labelsize=10)
         style_taxonomy_tick_labels(ax.yaxis, taxonomy_genes)
         if shared_xlim is not None:
             ax.set_xlim(*shared_xlim)
@@ -1165,9 +1214,10 @@ def plot_bar_per_state(
     }[args.bar_x_scale]
     fig.suptitle(
         f"{title_n.capitalize()} classifier-attributed genes per refined NK state ({scale_note})",
-        fontsize=13,
+        fontsize=18,
         fontweight="bold",
     )
+    style_all_legends(fig)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     save_figure(fig, fig_dir, "gene_attribution_bar_per_state")
 
@@ -1199,21 +1249,22 @@ def plot_heatmap_and_dotplot(
     vmax = float(np.nanmax(np.abs(mean_attr.values)))
     vmax = vmax if vmax > 0 else 1.0
 
-    fig_w = max(12, 0.38 * len(mean_attr.columns))
-    fig_h = max(4, 0.45 * len(states))
+    fig_w = max(14, 0.46 * len(mean_attr.columns))
+    fig_h = max(5, 0.56 * len(states))
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     im = ax.imshow(mean_attr.values, cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="auto")
     ax.grid(False, which="both")
     ax.tick_params(axis="both", which="both", length=0)
     ax.set_xticks(np.arange(len(mean_attr.columns)))
-    ax.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=7)
+    ax.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
     style_taxonomy_tick_labels(ax.xaxis, taxonomy_genes)
     ax.set_yticks(np.arange(len(states)))
-    ax.set_yticklabels(states, fontsize=9, fontweight="bold")
+    ax.set_yticklabels(states, fontsize=11, fontweight="bold")
     title_n = "selected" if top_n is None else f"top {top_n}"
-    ax.set_title(f"Integrated Gradients heatmap: {title_n} genes per state", fontsize=12, fontweight="bold")
+    ax.set_title(f"Integrated Gradients heatmap: {title_n} genes per state", fontsize=16, fontweight="bold")
     cbar = fig.colorbar(im, ax=ax, fraction=0.015, pad=0.01)
     cbar.set_label("Mean attribution")
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
     fig.tight_layout()
     save_figure(fig, fig_dir, "gene_attribution_heatmap")
 
@@ -1233,10 +1284,10 @@ def plot_heatmap_and_dotplot(
                 linewidth = 0.3
             ax2.scatter(xi, yi, s=size, color=color, edgecolors=edgecolor, linewidths=linewidth)
     ax2.set_xticks(np.arange(len(mean_attr.columns)))
-    ax2.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=7)
+    ax2.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
     style_taxonomy_tick_labels(ax2.xaxis, taxonomy_genes)
     ax2.set_yticks(np.arange(len(states)))
-    ax2.set_yticklabels(states, fontsize=9, fontweight="bold")
+    ax2.set_yticklabels(states, fontsize=11, fontweight="bold")
     ax2.set_xlim(-0.5, len(mean_attr.columns) - 0.5)
     ax2.set_ylim(-0.5, len(states) - 0.5)
     ax2.invert_yaxis()
@@ -1246,7 +1297,8 @@ def plot_heatmap_and_dotplot(
     sm.set_array([])
     cbar2 = fig2.colorbar(sm, ax=ax2, fraction=0.015, pad=0.01)
     cbar2.set_label("Mean attribution")
-    ax2.set_title(f"Integrated Gradients dot plot: {title_n} genes per state", fontsize=12, fontweight="bold")
+    ax2.set_title(f"Integrated Gradients dot plot: {title_n} genes per state", fontsize=16, fontweight="bold")
+    style_axis(ax2, tick_size=SMALL_TICK_LABEL_SIZE)
     fig2.tight_layout()
     save_figure(fig2, fig_dir, "gene_attribution_dotplot")
 
@@ -1289,6 +1341,7 @@ def order_heatmap_columns(df: pd.DataFrame, mode: str = "clustered") -> pd.DataF
 
 def save_figure(fig, fig_dir: str, stem: str) -> None:
     png = os.path.join(fig_dir, f"{stem}.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"[SAVE] {png}")

@@ -22,6 +22,16 @@ from nk_project.annotation_agent.taxonomy_reference import (
     taxonomy_support_level,
 )
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import (
+    LEGEND_FONT_SIZE,
+    SMALL_TICK_LABEL_SIZE,
+    set_presentation_style,
+    style_all_legends,
+    style_axis,
+    style_figure,
+)
+
+set_presentation_style()
 
 
 SUBTYPE_LABELS = {
@@ -382,8 +392,8 @@ def plot_heatmap(
 ) -> None:
     if wide.empty:
         return
-    fig_w = max(10, 0.34 * wide.shape[1])
-    fig_h = max(5, 0.32 * wide.shape[0])
+    fig_w = max(12, 0.44 * wide.shape[1])
+    fig_h = max(6, 0.42 * wide.shape[0])
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     values = wide.to_numpy(dtype=float)
     vmax = float(np.nanmax(values)) if np.isfinite(values).any() else 1.0
@@ -394,15 +404,16 @@ def plot_heatmap(
         [display_program_id(col, include_layer=include_layer) for col in wide.columns],
         rotation=45,
         ha="right",
-        fontsize=7,
+        fontsize=SMALL_TICK_LABEL_SIZE,
     )
     ax.set_yticks(np.arange(wide.shape[0]))
-    ax.set_yticklabels(wide.index, fontsize=8)
+    ax.set_yticklabels(wide.index, fontsize=11)
     ax.set_xlabel("Curated NK taxonomy marker program")
     ax.set_ylabel("Data-driven Leiden cluster")
-    ax.set_title(cbar_label, fontsize=12, fontweight="bold")
+    ax.set_title(cbar_label, fontsize=16, fontweight="bold")
     cbar = fig.colorbar(im, ax=ax, fraction=0.018, pad=0.01)
     cbar.set_label(cbar_label)
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
     fig.tight_layout()
     savefig(fig, fig_dir, name)
 
@@ -421,8 +432,8 @@ def plot_top_match_heatmap(long: pd.DataFrame, fig_dir: str) -> None:
         .copy()
     )
     clusters = sorted(long["cluster"].unique(), key=cluster_sort_key)
-    fig_h = max(4, 0.36 * len(clusters))
-    fig, ax = plt.subplots(figsize=(9, fig_h))
+    fig_h = max(5, 0.5 * len(clusters))
+    fig, ax = plt.subplots(figsize=(12, fig_h))
     y = np.arange(len(clusters))
     offsets = {"subtype": -0.18, "state": 0.18}
     colors = {"subtype": "#4c78a8", "state": "#f58518"}
@@ -444,15 +455,17 @@ def plot_top_match_heatmap(long: pd.DataFrame, fig_dir: str) -> None:
         for yi, value, label in zip(y + offsets[layer], values, labels):
             if value <= 0:
                 continue
-            ax.text(value + 0.15, yi, label, va="center", ha="left", fontsize=6)
+            ax.text(value + 0.15, yi, label, va="center", ha="left", fontsize=9)
     ax.set_yticks(y)
-    ax.set_yticklabels(clusters, fontsize=8)
+    ax.set_yticklabels(clusters, fontsize=11)
     ax.invert_yaxis()
     ax.set_xlabel("Weighted concordance score")
-    ax.set_title("Top subtype and state marker matches per data-driven cluster", fontsize=12, fontweight="bold")
-    ax.legend(handles=handles, frameon=False, loc="lower right", fontsize=8)
+    ax.set_title("Top subtype and state marker matches per data-driven cluster", fontsize=16, fontweight="bold")
+    ax.legend(handles=handles, frameon=False, loc="lower right", fontsize=LEGEND_FONT_SIZE)
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="x", alpha=0.25)
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
+    style_all_legends(fig)
     fig.tight_layout()
     savefig(fig, fig_dir, "top_taxonomy_match_by_cluster")
 
@@ -472,12 +485,12 @@ def plot_recurrent_genes(
     top = filtered.head(n).iloc[::-1]
     colors = np.where(top["in_taxonomy_reference"], "#c27c00", "#555555")
     fig_h = max(5, 0.23 * len(top))
-    fig, ax = plt.subplots(figsize=(8, fig_h))
+    fig, ax = plt.subplots(figsize=(10, fig_h))
     ax.barh(top["gene"], top["n_clusters_top_gene"], color=colors, alpha=0.9)
     ax.set_xlabel("Number of clusters where gene appears in top attribution genes")
     ax.set_title(
         f"Recurrent top attribution genes (>= {min_recurrent_clusters} clusters)",
-        fontsize=12,
+        fontsize=16,
         fontweight="bold",
     )
     ax.spines[["top", "right"]].set_visible(False)
@@ -489,8 +502,10 @@ def plot_recurrent_genes(
         ],
         frameon=False,
         loc="lower right",
-        fontsize=8,
+        fontsize=LEGEND_FONT_SIZE,
     )
+    style_axis(ax, tick_size=SMALL_TICK_LABEL_SIZE)
+    style_all_legends(fig)
     fig.tight_layout()
     savefig(fig, fig_dir, "recurrent_top_attribution_genes")
 
@@ -534,15 +549,15 @@ def plot_taxonomy_tree(long: pd.DataFrame, entries: list[TaxonomyEntry], fig_dir
     norm = plt.Normalize(vmin=0, vmax=vmax)
     cmap = plt.get_cmap("viridis")
 
-    fig_h = max(6, 0.28 * total_leaves)
-    fig, ax = plt.subplots(figsize=(11, fig_h))
+    fig_h = max(7, 0.38 * total_leaves)
+    fig, ax = plt.subplots(figsize=(13, fig_h))
     ax.scatter([0.0], [root_y], s=280, color="#222222", zorder=3)
-    ax.text(-0.08, root_y, "Curated NK taxonomy", ha="right", va="center", fontsize=10, fontweight="bold")
+    ax.text(-0.08, root_y, "Curated NK taxonomy", ha="right", va="center", fontsize=13, fontweight="bold")
 
     for layer, center in layer_centers.items():
         ax.plot([0.05, 1.0], [root_y, center], color="#999999", lw=1.2, zorder=1)
         ax.scatter([1.0], [center], s=230, color="#dddddd", edgecolor="#444444", zorder=3)
-        ax.text(0.92, center, layer_display_name(layer), ha="right", va="center", fontsize=9, fontweight="bold")
+        ax.text(0.92, center, layer_display_name(layer), ha="right", va="center", fontsize=12, fontweight="bold")
         for program in programs_by_layer[layer]:
             _, y = coords[program]
             score = float(score_by_program.get(program, 0.0))
@@ -556,23 +571,24 @@ def plot_taxonomy_tree(long: pd.DataFrame, entries: list[TaxonomyEntry], fig_dir
                 display_program_id(program, include_layer=False),
                 ha="left",
                 va="center",
-                fontsize=7,
+                fontsize=10,
             )
 
     sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
     cbar = fig.colorbar(sm, ax=ax, fraction=0.025, pad=0.02)
-    cbar.set_label("Best weighted concordance score across clusters")
+    cbar.set_label("Best weighted concordance score across clusters", fontweight="bold")
     ax.set_xlim(-0.65, 4.2)
     ax.set_ylim(y_cursor - 0.8, -1.0)
     ax.axis("off")
-    ax.set_title("Curated NK taxonomy tree with post hoc attribution concordance", fontsize=12, fontweight="bold")
+    ax.set_title("Curated NK taxonomy tree with post hoc attribution concordance", fontsize=16, fontweight="bold")
     fig.tight_layout()
     savefig(fig, fig_dir, "taxonomy_tree_concordance")
 
 
 def savefig(fig, fig_dir: str, name: str) -> None:
     png = os.path.join(fig_dir, f"{name}.png")
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
     fig.savefig(png, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[SAVE] {png}")

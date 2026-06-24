@@ -1,0 +1,32 @@
+#!/bin/bash
+#BSUB -J prep_nk_cb07
+#BSUB -W 03:00
+#BSUB -o /rsrch5/home/genomic_med/suorouji/projects/NK_project/logs/%J.00_prepare_cellxgene_cb07.out
+#BSUB -e /rsrch5/home/genomic_med/suorouji/projects/NK_project/logs/%J.00_prepare_cellxgene_cb07.err
+#BSUB -cwd /rsrch5/home/genomic_med/suorouji/projects/NK_project
+#BSUB -q short
+#BSUB -n 1
+#BSUB -M 475
+#BSUB -R rusage[mem=475]
+#BSUB -B
+#BSUB -N
+#BSUB -u suorouji@mdanderson.org
+
+set -euo pipefail
+
+cd /rsrch5/home/genomic_med/suorouji/projects/NK_project
+
+python -u scripts/00_prepare_cellxgene_cb07_input.py \
+  --cellxgene-h5ad /rsrch5/home/genomic_med/A3D3a/Bioinformatics/sc_nk/cell-by-gene/combine/CellxGene_NK_B_T.h5ad \
+  --cb07-h5ad /rsrch5/home/genomic_med/suorouji/projects/lsf_run/seurat_manual.h5ad \
+  --output-h5ad /rsrch5/home/genomic_med/suorouji/projects/lsf_run/cellxgene_nk_bt_plus_CB07_hvg2k_nkmarker_rescue.h5ad \
+  --qc-outdir /rsrch5/home/genomic_med/suorouji/projects/lsf_run/prepare_cellxgene_cb07_qc \
+  --n-hvg 2000 \
+  --hvg-source compute \
+  --hvg-batch-key assay_clean \
+  --marker-rescue-file /rsrch5/home/genomic_med/suorouji/projects/NK_project/nk_project/annotation_agent/references/canonical_nk_marker_rescue_genes.txt \
+  --cellxgene-nk-label-key State \
+  --cellxgene-nk-label-fallback Subtype \
+  --cb07-id-key cb_id \
+  --cb07-id-value CB07 \
+  --cb07-label-key functional_state

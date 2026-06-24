@@ -34,10 +34,10 @@ scripts/01_train_scvi.py
 scripts/02_run_leiden_discovery.py
 scripts/03_run_marker_analysis.py
 scripts/04_apply_refined_v1_labels.py
+scripts/04b_plot_annotation_flow.py
 scripts/05_train_scanvi_refined_v1.py
 scripts/06_evaluate_scanvi_refined_v1.py
 scripts/07_run_scanvi_surgery.py
-scripts/08_compare_batch_strategies.py
 ```
 
 ## Current Cleanup Status
@@ -79,15 +79,21 @@ nk_project/evaluation/
 ```text
 scripts/01_train_scvi.py
 scripts/04_apply_refined_v1_labels.py
+scripts/04b_plot_annotation_flow.py
 scripts/05_train_scanvi_refined_v1.py
 scripts/07_run_scanvi_surgery.py
-scripts/08_compare_batch_strategies.py
+```
+
+- Archived the older batch strategy comparison entrypoint:
+
+```text
+scripts/archive/08_compare_batch_strategies.py
 ```
 
 Still to do:
 
-- Run lightweight HPC checks for `04`, `05 --dry-run`, `07 --dry-run`, and
-  `08` with cached/smoke-test options as needed.
+- Run lightweight HPC checks for `04`, `04b`, `05 --dry-run`, and
+  `07 --dry-run` with cached/smoke-test options as needed.
 - Commit the cleanup after the HPC checks pass.
 
 ## Active Output Folders

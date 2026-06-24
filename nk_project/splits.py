@@ -26,7 +26,25 @@ def make_train_val_heldout_split(
 
     idx = np.arange(adata_remaining.n_obs)
     y = adata_remaining.obs[label_key].astype(str).values
-    train_idx, val_idx = train_test_split(idx, test_size=test_size, random_state=seed, stratify=y)
+    labels, counts = np.unique(y, return_counts=True)
+    rare_labels = set(labels[counts < 2])
+    if rare_labels:
+        rare_mask = np.isin(y, list(rare_labels))
+        common_idx = idx[~rare_mask]
+        rare_idx = idx[rare_mask]
+        common_y = y[~rare_mask]
+        if len(common_idx) == 0 or len(np.unique(common_y)) < 2:
+            train_idx, val_idx = train_test_split(idx, test_size=test_size, random_state=seed, stratify=None)
+        else:
+            train_idx, val_idx = train_test_split(
+                common_idx,
+                test_size=test_size,
+                random_state=seed,
+                stratify=common_y,
+            )
+            train_idx = np.concatenate([train_idx, rare_idx])
+    else:
+        train_idx, val_idx = train_test_split(idx, test_size=test_size, random_state=seed, stratify=y)
 
     adata_train = adata_remaining[train_idx].copy()
     adata_val = adata_remaining[val_idx].copy()

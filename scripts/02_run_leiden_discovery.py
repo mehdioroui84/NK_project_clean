@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from configs import default_config as cfg
 from nk_project.discovery import run_leiden_grid
 from nk_project.io_utils import ensure_dirs
+from nk_project.plot_style import LEGEND_FONT_SIZE, set_presentation_style, style_all_legends, style_figure, style_legend
+
+set_presentation_style()
 
 
 DEFAULT_RESOLUTIONS = [0.2, 0.3, 0.4]
@@ -48,7 +51,7 @@ VALIDATION_V1_BY_OLD_LABEL = {
 
 def main():
     args = parse_args()
-    outdir = os.path.join(cfg.BASE_OUTDIR, "leiden_discovery")
+    outdir = args.outdir or os.path.join(cfg.BASE_OUTDIR, "leiden_discovery")
     figdir = os.path.join(outdir, "figures")
     ensure_dirs(outdir, figdir)
 
@@ -108,6 +111,11 @@ def parse_args():
         )
     )
     parser.add_argument("--input-h5ad", default=None)
+    parser.add_argument(
+        "--outdir",
+        default=None,
+        help="Output directory. Default: outputs/leiden_discovery.",
+    )
     parser.add_argument("--latent-key", default="X_scVI")
     parser.add_argument("--resolutions", type=float, nargs="+", default=DEFAULT_RESOLUTIONS)
     parser.add_argument("--worksheet-resolution", type=float, default=DEFAULT_WORKSHEET_RESOLUTION)
@@ -123,7 +131,7 @@ def plot_resolution_overview(adata, resolutions, outdir):
         raise KeyError("X_umap not found in full Leiden AnnData.")
     nrows = len(resolutions)
     ncols = 3
-    fig, axes = plt.subplots(nrows, ncols, figsize=(21, 6.0 * nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(24, 7.0 * nrows))
     if nrows == 1:
         axes = np.asarray([axes])
 
@@ -167,7 +175,9 @@ def plot_resolution_overview(adata, resolutions, outdir):
                     show_legend=True,
                 )
 
-    fig.suptitle("Full-data SCVI latent space: Leiden resolution comparison", fontsize=15)
+    fig.suptitle("Full-data SCVI latent space: Leiden resolution comparison", fontsize=20, fontweight="bold")
+    style_figure(fig, tick_size=10, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     plt.tight_layout()
     png = os.path.join(outdir, "full_leiden_resolution_overview.png")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
@@ -191,8 +201,8 @@ def plot_single_resolution_overview(adata, resolution, outdir):
         (cfg.ASSAY_CLEAN_KEY, f"3.1 {cfg.ASSAY_CLEAN_KEY}", True, False),
     ]
 
-    fig, axes = plt.subplots(3, 2, figsize=(20, 22))
-    fig.suptitle(f"Full-data SCVI latent space: {groupby}", fontsize=14)
+    fig, axes = plt.subplots(3, 2, figsize=(24, 26))
+    fig.suptitle(f"Full-data SCVI latent space: {groupby}", fontsize=20, fontweight="bold")
     axes = axes.ravel()
 
     for ax, (obs_key, title, show_legend, annotate) in zip(axes, panels):
@@ -212,18 +222,9 @@ def plot_single_resolution_overview(adata, resolution, outdir):
         )
 
     axes[-1].axis("off")
-    axes[-1].text(
-        0.02,
-        0.95,
-        "Next step:\nmap full Leiden clusters\n"
-        "to NK_State_refined labels using\n"
-        "cluster composition + markers + DE.",
-        ha="left",
-        va="top",
-        fontsize=16,
-        color="#17202a",
-    )
 
+    style_figure(fig, tick_size=10, legend_size=LEGEND_FONT_SIZE)
+    style_all_legends(fig)
     plt.tight_layout()
     png = os.path.join(outdir, f"full_{groupby}_overview.png")
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
@@ -337,7 +338,7 @@ def scatter_categorical(
             label=category,
         )
 
-    ax.set_title(title)
+    ax.set_title(title, fontsize=16, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlabel("")
@@ -357,7 +358,7 @@ def scatter_categorical(
             [0],
             marker="o",
             linestyle="",
-            markersize=7,
+            markersize=10,
             markerfacecolor=colors[category],
             markeredgecolor="none",
             alpha=1.0,
@@ -368,11 +369,12 @@ def scatter_categorical(
     ax.legend(
         handles=handles,
         frameon=False,
-        fontsize=7,
+        fontsize=LEGEND_FONT_SIZE,
         loc="upper left",
         bbox_to_anchor=(1.02, 1.0),
         handletextpad=0.4,
     )
+    style_legend(ax.get_legend())
 
 
 def annotate_category_centers(ax, xy, values):
@@ -388,7 +390,7 @@ def annotate_category_centers(ax, xy, values):
             category,
             ha="center",
             va="center",
-            fontsize=7,
+            fontsize=10,
             color="black",
             weight="bold",
             bbox={
