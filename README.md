@@ -32,12 +32,18 @@ NK_project/
     01_train_scvi.py
     01b_compare_scvi_batch_strategies.py
     02_run_leiden_discovery.py
+    02b_score_leiden_resolution_auc.py
     02c_leiden_cluster_stability.py
     03_run_marker_analysis.py
+    03b_draft_refined_annotations_agent.py
+    03c_export_annotation_validation_table.py
+    03d_export_cellxgene_cluster_report.py
+    03e_machine_review_cluster_labels.py
     04_apply_refined_v1_labels.py
     04b_plot_annotation_flow.py
     05_train_scanvi_refined_v1.py
     06_evaluate_scanvi_refined_v1.py
+    06b_inhouse_zero_shot_scanvi.py
     07_run_scanvi_surgery.py
     09_gene_attribution.py
     10_attribution_taxonomy_concordance.py
@@ -78,6 +84,11 @@ python scripts/09_gene_attribution.py 2>&1 | tee logs/09_gene_attribution.log
 Optional comparisons:
 
 ```bash
+python scripts/01b_compare_scvi_batch_strategies.py 2>&1 | tee logs/01b_compare_scvi_batch_strategies.log
+python scripts/02b_score_leiden_resolution_auc.py 2>&1 | tee logs/02b_score_leiden_resolution_auc.log
+python scripts/02c_leiden_cluster_stability.py 2>&1 | tee logs/02c_leiden_cluster_stability.log
+python scripts/03b_draft_refined_annotations_agent.py --dry-run 2>&1 | tee logs/03b_draft_refined_annotations_agent.log
+python scripts/06b_inhouse_zero_shot_scanvi.py --plot-existing 2>&1 | tee logs/06b_inhouse_zero_shot_scanvi.log
 python scripts/07_run_scanvi_surgery.py --new-assays-only 2>&1 | tee logs/07_run_scanvi_surgery.log
 ```
 
@@ -90,8 +101,14 @@ python scripts/07_run_scanvi_surgery.py --new-assays-only 2>&1 | tee logs/07_run
 5. Plot annotation flow and manual-vs-agent agreement.
 6. Train SCANVI with `NK_State_refined`.
 7. Evaluate full-data, held-out zero-shot, and by-dataset performance.
-8. Compute classifier-head gene attribution with Integrated Gradients.
+8. Optionally project in-house cord blood data.
 9. Optionally compare SCANVI surgery.
+10. Compute classifier-head gene attribution with Integrated Gradients.
+11. Compare attribution genes to the curated taxonomy/reference markers.
+
+The `b/c/d/e` suffix scripts are stage-specific diagnostics, reports, or optional
+helpers. Step `08` is intentionally unused in the active pipeline; the older batch
+strategy script is preserved under `scripts/archive/`.
 
 See `PROJECT_PLAN.md` for the living analysis plan and progress checklist.
 

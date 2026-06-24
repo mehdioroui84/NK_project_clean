@@ -27,17 +27,37 @@ not intentionally preserve generated `outputs/`.
 
 ## Canonical v1 Pipeline Scripts
 
-The active `scripts/` folder should converge to this small set:
+The active `scripts/` folder should use this numbered order. Plain numbers are
+the main path; letter suffixes are stage-specific diagnostics, reports, or
+optional helpers.
 
 ```text
+scripts/00_prepare_cellxgene_cb07_input.py
 scripts/01_train_scvi.py
+scripts/01b_compare_scvi_batch_strategies.py
 scripts/02_run_leiden_discovery.py
+scripts/02b_score_leiden_resolution_auc.py
+scripts/02c_leiden_cluster_stability.py
 scripts/03_run_marker_analysis.py
+scripts/03b_draft_refined_annotations_agent.py
+scripts/03c_export_annotation_validation_table.py
+scripts/03d_export_cellxgene_cluster_report.py
+scripts/03e_machine_review_cluster_labels.py
 scripts/04_apply_refined_v1_labels.py
 scripts/04b_plot_annotation_flow.py
 scripts/05_train_scanvi_refined_v1.py
 scripts/06_evaluate_scanvi_refined_v1.py
+scripts/06b_inhouse_zero_shot_scanvi.py
 scripts/07_run_scanvi_surgery.py
+scripts/09_gene_attribution.py
+scripts/10_attribution_taxonomy_concordance.py
+```
+
+Step `08` is intentionally unused in the active pipeline. The older batch
+strategy comparison entrypoint is preserved at:
+
+```text
+scripts/archive/08_compare_batch_strategies.py
 ```
 
 ## Current Cleanup Status
@@ -89,6 +109,9 @@ scripts/07_run_scanvi_surgery.py
 ```text
 scripts/archive/08_compare_batch_strategies.py
 ```
+
+- Kept `08` unused in the active numbered pipeline to make the archived step
+  visible without forcing a broad renumber.
 
 Still to do:
 
