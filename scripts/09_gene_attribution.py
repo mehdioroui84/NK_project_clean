@@ -77,7 +77,15 @@ NON_NK_LABEL_TOKENS = (
 
 BROAD_EXACT_GENES = {"MALAT1", "B2M", "TMSB4X", "HBB"}
 BROAD_PREFIXES = ("MT-", "RPS", "RPL", "HBA")
-TAXONOMY_HIGHLIGHT_COLOR = "#c27c00"
+TAXONOMY_HIGHLIGHT_COLOR = "#E3B505"
+ATTRIBUTION_LEGEND_FONT_SIZE = 17
+TIER_COLORS = {
+    "core": "#E3B505",
+    "support": "#AEB7C2",
+    "context": "#CD7F32",
+    "negative_expected_low": "#4E79A7",
+}
+UNCLASSIFIED_COLOR = "#2A9D8F"
 
 
 class SCANVIClassifierWrapper(nn.Module):
@@ -108,8 +116,50 @@ class SCANVIClassifierWrapper(nn.Module):
         return logits
 
 
+class ContrastiveSCANVIWrapper(nn.Module):
+    """Returns logit[target] - mean(logit[foil_indices]) as a scalar per cell."""
+
+    def __init__(self, base_wrapper: SCANVIClassifierWrapper, target_idx: int, foil_indices: torch.Tensor):
+        super().__init__()
+        self.base = base_wrapper
+        self.target_idx = target_idx
+        self.register_buffer("foil_indices", foil_indices)
+
+    def forward(self, x: torch.Tensor, batch_index: torch.Tensor) -> torch.Tensor:
+        logits = self.base(x, batch_index)
+        return logits[:, self.target_idx] - logits[:, self.foil_indices].mean(dim=1)
+
+
 def main() -> None:
     args = parse_args()
+    if args.all_modes:
+        run_all_modes(args)
+        return
+
+    run_single_mode(args)
+
+
+def run_all_modes(args: argparse.Namespace) -> None:
+    ref_outdir = args.ref_outdir or os.path.join(cfg.BASE_OUTDIR, DEFAULT_REF_OUTDIR_NAME)
+    base_outdir = args.outdir or os.path.join(ref_outdir, "gene_attribution_all_modes")
+
+    for mode_name, contrastive in [
+        ("normal_classifier_logit", False),
+        ("contrastive_classifier_logit_vs_other_nk", True),
+    ]:
+        mode_args = argparse.Namespace(**vars(args))
+        mode_args.all_modes = False
+        mode_args.contrastive = contrastive
+        mode_args.outdir = os.path.join(base_outdir, mode_name)
+        print("\n" + "=" * 80)
+        print(f"[ALL_MODES] Running {mode_name}")
+        print("=" * 80)
+        run_single_mode(mode_args)
+
+    print(f"[DONE] All classifier IG modes complete: {base_outdir}")
+
+
+def run_single_mode(args: argparse.Namespace) -> None:
     set_global_seed(args.seed)
 
     ref_outdir = args.ref_outdir or os.path.join(cfg.BASE_OUTDIR, DEFAULT_REF_OUTDIR_NAME)
@@ -168,6 +218,13 @@ def main() -> None:
     print(f"[DEVICE] {device}")
     print(f"[CLASSIFIER] scanvi_model.module.{classifier_attr}")
     print("[LABEL_ORDER] " + ", ".join(f"{i}:{label}" for i, label in enumerate(label_order)))
+    nk_label_indices = torch.tensor(
+        [i for i, label in enumerate(label_order)
+         if not is_non_nk_label(str(label)) and str(label) != cfg.UNLABELED_CATEGORY],
+        dtype=torch.long,
+        device=device,
+    )
+    print("[NK_LABEL_INDICES] " + ", ".join(f"{i}:{label_order[i]}" for i in nk_label_indices.tolist()))
 
     target_states = resolve_target_states(args, label_order, proba.columns)
     target_states = filter_target_states_by_label_and_prediction(obs, proba, target_states, args)
@@ -231,6 +288,7 @@ def main() -> None:
             baseline_vector=baseline_vector,
             wrapper=wrapper,
             target_idx=state_to_idx[state],
+            nk_label_indices=nk_label_indices,
             method=method,
             args=args,
             device=device,
@@ -343,7 +401,7 @@ def parse_args() -> argparse.Namespace:
         choices=["all", "Train", "Val", "Held-out"],
         help="Which SCANVI split to attribute. Default: all evaluated cells.",
     )
-    parser.add_argument("--min-proba", type=float, default=0.70)
+    parser.add_argument("--min-proba", type=float, default=0.90)
     parser.add_argument(
         "--min-attribution-cells",
         type=int,
@@ -407,6 +465,23 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--baseline", choices=["zero", "gene_mean", "gene_median"], default="zero")
+    parser.add_argument(
+        "--contrastive",
+        action="store_true",
+        help=(
+            "Class-contrastive IG: attribute logit[target] - mean(logit[other NK states]) "
+            "instead of logit[target] alone. Highlights genes that uniquely discriminate "
+            "each NK state from all other NK states rather than genes that simply activate it."
+        ),
+    )
+    parser.add_argument(
+        "--all-modes",
+        action="store_true",
+        help=(
+            "Run both classifier IG modes into separate subdirectories: normal classifier "
+            "logit attribution and contrastive classifier logit-vs-other-NK attribution."
+        ),
+    )
     parser.add_argument(
         "--include-unseen-batches",
         action="store_true",
@@ -538,6 +613,21 @@ def load_taxonomy_marker_gene_set() -> set[str]:
     return genes
 
 
+def load_taxonomy_gene_tiers() -> dict[str, str]:
+    """Return gene -> highest taxonomy marker tier."""
+    tier_rank = {"core": 4, "support": 3, "context": 2, "negative_expected_low": 1}
+    result: dict[str, int] = {}
+    for entry in load_taxonomy_entries():
+        for tier, marker_list in entry.markers.items():
+            rank = tier_rank.get(tier, 0)
+            for gene in marker_list:
+                gene_upper = str(gene).upper()
+                if result.get(gene_upper, 0) < rank:
+                    result[gene_upper] = rank
+    rank_to_tier = {4: "core", 3: "support", 2: "context", 1: "negative_expected_low"}
+    return {gene: rank_to_tier[rank] for gene, rank in result.items()}
+
+
 def annotate_taxonomy_highlight_columns(df: pd.DataFrame, taxonomy_genes: set[str]) -> pd.DataFrame:
     out = df.copy()
     out["in_taxonomy_reference"] = out["gene"].astype(str).str.upper().isin(taxonomy_genes)
@@ -546,9 +636,9 @@ def annotate_taxonomy_highlight_columns(df: pd.DataFrame, taxonomy_genes: set[st
 
 def style_taxonomy_tick_labels(axis, taxonomy_genes: set[str]) -> None:
     for tick in axis.get_ticklabels():
+        tick.set_fontweight("bold")
         if tick.get_text().upper() in taxonomy_genes:
             tick.set_color(TAXONOMY_HIGHLIGHT_COLOR)
-            tick.set_fontweight("bold")
 
 
 def set_global_seed(seed: int) -> None:
@@ -753,6 +843,11 @@ def filter_target_states_by_label_and_prediction(
 
 
 def make_batch_indices(model, adata, args: argparse.Namespace, device: torch.device) -> torch.Tensor:
+    if "_scvi_batch" in adata.obs and args.query_model_reference_h5ad and not args.fixed_batch_category:
+        indices = np.asarray(adata.obs["_scvi_batch"], dtype=np.int64)
+        print("[BATCH_MODE] using scvi-tools encoded obs['_scvi_batch']")
+        return torch.tensor(indices[:, None], dtype=torch.long, device=device)
+
     batch_state = model.adata_manager.get_state_registry("batch")
     batch_order = [str(x) for x in batch_state.categorical_mapping]
     batch_to_idx = {batch: i for i, batch in enumerate(batch_order)}
@@ -888,10 +983,20 @@ def run_state_attribution(
     baseline_vector: np.ndarray,
     wrapper: SCANVIClassifierWrapper,
     target_idx: int,
+    nk_label_indices: torch.Tensor,
     method: str,
     args: argparse.Namespace,
     device: torch.device,
 ) -> dict[str, np.ndarray | int]:
+    if args.contrastive:
+        foil_indices = nk_label_indices[nk_label_indices != target_idx]
+        active_wrapper = ContrastiveSCANVIWrapper(wrapper, target_idx, foil_indices).to(device)
+        active_wrapper.eval()
+        captum_target = None
+    else:
+        active_wrapper = wrapper
+        captum_target = target_idx
+
     attr_sum = np.zeros(adata.n_vars, dtype=np.float64)
     abs_sum = np.zeros(adata.n_vars, dtype=np.float64)
     n_total = 0
@@ -906,21 +1011,21 @@ def run_state_attribution(
 
         if method == "captum":
             attrs = integrated_gradients_captum(
-                wrapper,
+                active_wrapper,
                 x_tensor,
                 batch_tensor,
                 baseline,
-                target_idx,
+                captum_target,
                 args.ig_steps,
                 args.captum_internal_batch_size,
             )
         else:
             attrs = integrated_gradients_manual(
-                wrapper,
+                active_wrapper,
                 x_tensor,
                 batch_tensor,
                 baseline,
-                target_idx,
+                captum_target,
                 args.ig_steps,
             )
 
@@ -977,7 +1082,7 @@ def integrated_gradients_manual(
     for alpha in alphas:
         x_interp = (baseline + alpha * (x - baseline)).detach().requires_grad_(True)
         logits = wrapper(x_interp, batch_index)
-        target_logits = logits[:, target_idx].sum()
+        target_logits = logits.sum() if logits.dim() == 1 else logits[:, target_idx].sum()
         wrapper.zero_grad(set_to_none=True)
         target_logits.backward()
         grad_sum += x_interp.grad.detach()
@@ -1153,11 +1258,11 @@ def plot_bar_per_state(
     top_n: int | None,
     args: argparse.Namespace,
 ) -> None:
-    taxonomy_genes = load_taxonomy_marker_gene_set()
+    tier_map = load_taxonomy_gene_tiers()
     n_states = len(ranked_tables)
     n_cols = min(3, n_states)
     n_rows = ceil(n_states / n_cols)
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6.4 * n_cols, 5.0 * n_rows), squeeze=False)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(7.0 * n_cols, 5.5 * n_rows), squeeze=False)
 
     shared_xlim = None
     if args.bar_x_scale == "shared":
@@ -1180,20 +1285,24 @@ def plot_bar_per_state(
     for ax, (state, df) in zip(axes.ravel(), ranked_tables.items()):
         ax.axis("on")
         top = df if top_n is None else df.head(top_n)
-        top = top.sort_values("mean_attr", ascending=True)
-        colors = np.where(top["mean_attr"].values >= 0, "#b23a48", "#457b9d")
-        bars = ax.barh(top["gene"], top["mean_attr"], color=colors, alpha=0.88)
-        for bar, gene in zip(bars, top["gene"].astype(str)):
-            if gene.upper() in taxonomy_genes:
-                bar.set_edgecolor(TAXONOMY_HIGHLIGHT_COLOR)
-                bar.set_linewidth(1.5)
+        top = (
+            top.assign(_plot_abs_signed_attr=top["mean_attr"].abs())
+            .sort_values("_plot_abs_signed_attr", ascending=True)
+        )
+        colors = [
+            TIER_COLORS.get(tier_map.get(str(gene).upper(), ""), UNCLASSIFIED_COLOR)
+            for gene in top["gene"].astype(str)
+        ]
+        ax.barh(top["gene"], top["mean_attr"], color=colors, alpha=0.92)
         ax.axvline(0, color="#222222", linewidth=0.8)
         ax.set_title(state, fontsize=13, fontweight="bold")
         ax.set_xlabel("Mean Integrated Gradients attribution")
-        ax.xaxis.label.set_fontsize(12)
+        ax.xaxis.label.set_fontsize(11)
         ax.xaxis.label.set_fontweight("bold")
-        ax.tick_params(axis="both", labelsize=10)
-        style_taxonomy_tick_labels(ax.yaxis, taxonomy_genes)
+        ax.tick_params(axis="x", labelsize=10)
+        ax.tick_params(axis="y", labelsize=10.5)
+        for tick in ax.yaxis.get_ticklabels():
+            tick.set_fontweight("bold")
         if shared_xlim is not None:
             ax.set_xlim(*shared_xlim)
         elif args.bar_x_scale == "per_state":
@@ -1217,8 +1326,29 @@ def plot_bar_per_state(
         fontsize=18,
         fontweight="bold",
     )
-    style_all_legends(fig)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=TIER_COLORS["core"], label="Core marker"),
+        Patch(facecolor=TIER_COLORS["support"], label="Support marker"),
+        Patch(facecolor=TIER_COLORS["context"], label="Context marker"),
+        Patch(facecolor=TIER_COLORS["negative_expected_low"], label="Negative/expected-low"),
+        Patch(facecolor=UNCLASSIFIED_COLOR, label="Not in taxonomy"),
+    ]
+    fig.legend(
+        handles=legend_elements,
+        loc="lower center",
+        ncol=5,
+        fontsize=ATTRIBUTION_LEGEND_FONT_SIZE,
+        frameon=True,
+        bbox_to_anchor=(0.5, 0.005),
+        handlelength=2.2,
+        handleheight=1.4,
+        borderpad=0.8,
+        labelspacing=0.8,
+        columnspacing=1.6,
+    )
+    style_all_legends(fig, fontsize=ATTRIBUTION_LEGEND_FONT_SIZE)
+    fig.tight_layout(rect=[0, 0.055, 1, 0.96])
     save_figure(fig, fig_dir, "gene_attribution_bar_per_state")
 
 
@@ -1256,7 +1386,7 @@ def plot_heatmap_and_dotplot(
     ax.grid(False, which="both")
     ax.tick_params(axis="both", which="both", length=0)
     ax.set_xticks(np.arange(len(mean_attr.columns)))
-    ax.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
+    ax.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=SMALL_TICK_LABEL_SIZE + 1)
     style_taxonomy_tick_labels(ax.xaxis, taxonomy_genes)
     ax.set_yticks(np.arange(len(states)))
     ax.set_yticklabels(states, fontsize=11, fontweight="bold")
@@ -1284,7 +1414,7 @@ def plot_heatmap_and_dotplot(
                 linewidth = 0.3
             ax2.scatter(xi, yi, s=size, color=color, edgecolors=edgecolor, linewidths=linewidth)
     ax2.set_xticks(np.arange(len(mean_attr.columns)))
-    ax2.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=SMALL_TICK_LABEL_SIZE)
+    ax2.set_xticklabels(mean_attr.columns, rotation=45, ha="right", fontsize=SMALL_TICK_LABEL_SIZE + 1)
     style_taxonomy_tick_labels(ax2.xaxis, taxonomy_genes)
     ax2.set_yticks(np.arange(len(states)))
     ax2.set_yticklabels(states, fontsize=11, fontweight="bold")
@@ -1341,7 +1471,7 @@ def order_heatmap_columns(df: pd.DataFrame, mode: str = "clustered") -> pd.DataF
 
 def save_figure(fig, fig_dir: str, stem: str) -> None:
     png = os.path.join(fig_dir, f"{stem}.png")
-    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=LEGEND_FONT_SIZE)
+    style_figure(fig, tick_size=SMALL_TICK_LABEL_SIZE, legend_size=ATTRIBUTION_LEGEND_FONT_SIZE)
     fig.savefig(png, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"[SAVE] {png}")

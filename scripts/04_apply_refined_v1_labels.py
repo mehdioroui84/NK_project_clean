@@ -484,8 +484,8 @@ def plot_annotation_qc_umap(adata, figdir, *, panel9_min_cells=0):
         signed_score,
         "6. signed NK identity score (red=NK-like, blue=NK-excluded)",
         cmap="RdBu_r",
-        symmetric=True,
-        robust=True,
+        vmin=-3.0,
+        vmax=3.0,
     )
     scatter_continuous(
         axes[6],
@@ -569,8 +569,8 @@ def plot_annotation_qc_umap_3d(adata, figdir, xyz, *, panel9_min_cells=0):
         signed_score,
         "6. signed NK identity score (red=NK-like, blue=NK-excluded)",
         cmap="RdBu_r",
-        symmetric=True,
-        robust=True,
+        vmin=-3.0,
+        vmax=3.0,
     )
     scatter_continuous_3d(
         axes[6],
@@ -669,7 +669,7 @@ def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score, *, 
                 f"Panel 9 filter removed all clusters; lower --panel9-min-cells below {min_cells}."
             )
     colors = category_colors(cluster["label"].tolist())
-    sizes = 28 + 120 * np.sqrt(cluster["n_cells"] / cluster["n_cells"].max())
+    sizes = 90 + 280 * np.sqrt(cluster["n_cells"] / cluster["n_cells"].max())
 
     for _, row in cluster.iterrows():
         ax.scatter(
@@ -679,7 +679,7 @@ def plot_cluster_marker_agreement(ax, adata, positive_score, excluded_score, *, 
             color=colors[row["label"]],
             alpha=0.82,
             edgecolors="white",
-            linewidths=0.35,
+            linewidths=0.8,
         )
         ax.text(
             row["positive_score"],
@@ -725,6 +725,20 @@ def set_padded_limits(ax, values, *, axis: str):
         ax.set_ylim(*limits)
 
 
+def report_color_clip(title: str, values: np.ndarray, vmin: float, vmax: float) -> None:
+    finite = np.isfinite(values)
+    if not finite.any():
+        return
+    n = int(finite.sum())
+    below = int((values[finite] < vmin).sum())
+    above = int((values[finite] > vmax).sum())
+    clipped = below + above
+    print(
+        f"[COLOR_RANGE] {title}: vmin={vmin:.3g}, vmax={vmax:.3g}; "
+        f"clipped={clipped:,}/{n:,} ({clipped / n:.3%}; below={below:,}, above={above:,})"
+    )
+
+
 def scatter_continuous(
     ax,
     xy,
@@ -734,12 +748,17 @@ def scatter_continuous(
     cmap,
     robust=False,
     symmetric=False,
+    vmin=None,
+    vmax=None,
 ):
     values = np.asarray(values, dtype=float)
     finite = np.isfinite(values)
     plot_values = values.copy()
     plot_values[~finite] = np.nan
-    if finite.any() and robust:
+    if vmin is not None and vmax is not None:
+        vmin = float(vmin)
+        vmax = float(vmax)
+    elif finite.any() and robust:
         if symmetric:
             limit = np.nanpercentile(np.abs(plot_values[finite]), 99)
             vmin, vmax = -limit, limit
@@ -752,6 +771,7 @@ def scatter_continuous(
         vmin, vmax = 0.0, 1.0
     if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
         vmin, vmax = 0.0, 1.0
+    report_color_clip(title, plot_values, vmin, vmax)
 
     order = np.argsort(np.nan_to_num(plot_values, nan=-np.inf))
     sc = ax.scatter(
@@ -785,12 +805,17 @@ def scatter_continuous_3d(
     cmap,
     robust=False,
     symmetric=False,
+    vmin=None,
+    vmax=None,
 ):
     values = np.asarray(values, dtype=float)
     finite = np.isfinite(values)
     plot_values = values.copy()
     plot_values[~finite] = np.nan
-    if finite.any() and robust:
+    if vmin is not None and vmax is not None:
+        vmin = float(vmin)
+        vmax = float(vmax)
+    elif finite.any() and robust:
         if symmetric:
             limit = np.nanpercentile(np.abs(plot_values[finite]), 99)
             vmin, vmax = -limit, limit
@@ -803,6 +828,7 @@ def scatter_continuous_3d(
         vmin, vmax = 0.0, 1.0
     if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
         vmin, vmax = 0.0, 1.0
+    report_color_clip(title, plot_values, vmin, vmax)
 
     order = np.argsort(np.nan_to_num(plot_values, nan=-np.inf))
     sc = ax.scatter(
@@ -1134,6 +1160,7 @@ def category_colors(categories):
         "NK1_Chemokine_inflammatory": "#0072B2",
         "NK1_Cytotoxic_activated": "#D55E00",
         "NK1_Checkpoint_exhausted": "#7570B3",
+        "NK1_ER_stress_UPR": "#1B4F9C",
         "NK1_Proliferating": "#80B1D3",
         "NK2_Chemokine_inflammatory": "#33A02C",
         "NK2_CIMP_cytokine_primed_memory_like": "#F0E442",

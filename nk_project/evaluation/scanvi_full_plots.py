@@ -64,6 +64,7 @@ PREFERRED_STATE_COLORS = {
     "NK1_Chemokine_inflammatory": "#0072B2",
     "NK1_Cytotoxic_activated": "#D55E00",
     "NK1_Checkpoint_exhausted": "#7570B3",
+    "NK1_ER_stress_UPR": "#1B4F9C",
     "NK1_Metabolic_stress_hypoxia": "#11A579",
     "NK1_Proliferating": "#80B1D3",
     "NK2_Chemokine_inflammatory": "#33A02C",

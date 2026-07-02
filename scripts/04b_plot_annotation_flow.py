@@ -58,6 +58,29 @@ LEGEND_LABEL_REPLACEMENTS = {
     "Proliferating": "Prolif.",
 }
 
+MATRIX_LABEL_REPLACEMENTS = {
+    "Developmental": "Devel",
+    "developmental": "devel",
+    "immature": "immat",
+    "Metabolic": "Metab",
+    "metabolic": "metab",
+    "hypoxia": "hypox",
+    "Chemokine": "Chem",
+    "chemokine": "chem",
+    "inflammatory": "inflam",
+    "Cytotoxic": "Cyto",
+    "cytotoxic": "cyto",
+    "activated": "act",
+    "Proliferating": "Prolif",
+    "proliferating": "prolif",
+    "Homeostatic": "Homeo",
+    "homeostatic": "homeo",
+    "quiescent": "quies",
+    "adaptive": "adapt",
+    "Development": "Devel",
+    "stress": "stress",
+}
+
 
 def main() -> None:
     args = parse_args()
@@ -79,6 +102,7 @@ def main() -> None:
         .replace({"nan": "Unknown", "None": "Unknown", "": "Unknown"})
     )
     df.columns = ["left", "middle", "right"]
+    df = add_agent_confidence(df, args)
     xy = np.asarray(adata.obsm["X_umap"]) if "X_umap" in adata.obsm else None
 
     grey_patterns = [re.compile(pattern, flags=re.IGNORECASE) for pattern in args.grey_pattern]
@@ -97,6 +121,7 @@ def main() -> None:
             color_scale=args.matrix_color_scale,
             min_count_label=args.matrix_min_count_label,
             min_row_pct_label=args.matrix_min_row_pct_label,
+            confidence_col="agent_confidence" if "agent_confidence" in df.columns else None,
         )
         print("[DONE] Annotation matrix heatmap complete.")
         return
@@ -144,6 +169,7 @@ def main() -> None:
             color_scale=args.matrix_color_scale,
             min_count_label=args.matrix_min_count_label,
             min_row_pct_label=args.matrix_min_row_pct_label,
+            confidence_col="agent_confidence" if "agent_confidence" in df.columns else None,
         )
 
     print("[DONE] Annotation flow plots complete.")
@@ -219,6 +245,27 @@ def parse_args() -> argparse.Namespace:
         help="Only annotate matrix cells with at least this row fraction.",
     )
     parser.add_argument(
+        "--agent-mapping-csv",
+        default=None,
+        help=(
+            "Optional annotation-agent cluster_annotation_mapping.csv. When provided, "
+            "matrix cells involving the agent/right annotation include mean confidence."
+        ),
+    )
+    parser.add_argument(
+        "--agent-confidence-column",
+        default="confidence_score_0_5",
+        help="Confidence column in --agent-mapping-csv. Default: confidence_score_0_5.",
+    )
+    parser.add_argument(
+        "--agent-cluster-column",
+        default=None,
+        help=(
+            "Cluster column in --agent-mapping-csv. Default uses --middle-key, "
+            "usually leiden_0_4."
+        ),
+    )
+    parser.add_argument(
         "--grey-pattern",
         action="append",
         default=DEFAULT_GREY_PATTERNS.copy(),
@@ -237,6 +284,37 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     return parser.parse_args()
+
+
+def add_agent_confidence(df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
+    if not args.agent_mapping_csv:
+        return df
+    print(f"[LOAD] {args.agent_mapping_csv}")
+    mapping = pd.read_csv(args.agent_mapping_csv)
+    cluster_col = args.agent_cluster_column or args.middle_key
+    confidence_col = args.agent_confidence_column
+    missing = [col for col in [cluster_col, confidence_col] if col not in mapping.columns]
+    if missing:
+        raise KeyError(f"Missing columns in --agent-mapping-csv: {missing}")
+
+    confidence = (
+        mapping[[cluster_col, confidence_col]]
+        .dropna(subset=[cluster_col])
+        .assign(
+            **{
+                cluster_col: lambda x: x[cluster_col].astype(str),
+                confidence_col: lambda x: pd.to_numeric(x[confidence_col], errors="coerce"),
+            }
+        )
+        .dropna(subset=[confidence_col])
+        .drop_duplicates(subset=[cluster_col], keep="first")
+        .set_index(cluster_col)[confidence_col]
+    )
+    out = df.copy()
+    out["agent_confidence"] = out["middle"].astype(str).map(confidence)
+    n_mapped = int(out["agent_confidence"].notna().sum())
+    print(f"[CONFIDENCE] mapped confidence for {n_mapped:,}/{len(out):,} cells")
+    return out
 
 
 def build_shared_colors(df: pd.DataFrame, grey_patterns: list[re.Pattern]) -> dict[str, dict[str, object]]:
@@ -376,6 +454,15 @@ def shorten_legend_label(label: str, *, max_chars: int = DEFAULT_MAX_LEGEND_LABE
     return display
 
 
+def shorten_matrix_label(label: str) -> str:
+    display = str(label)
+    for old, new in MATRIX_LABEL_REPLACEMENTS.items():
+        display = display.replace(old, new)
+    display = display.replace("CIMP_cytokine_primed_memory_like", "CIMP_memory")
+    display = display.replace("ER_stress_UPR", "ER_stress")
+    return display
+
+
 def annotate_centers(ax, xy: np.ndarray, values) -> None:
     values = np.asarray(values).astype(str)
     for category in sorted(set(values), key=category_sort_key):
@@ -409,6 +496,7 @@ def plot_matrix_heatmaps(
     color_scale: str,
     min_count_label: int,
     min_row_pct_label: float,
+    confidence_col: str | None = None,
 ) -> None:
     left_order, middle_order, right_order = ordered_layers(df)
     pair_specs = {
@@ -421,6 +509,12 @@ def plot_matrix_heatmaps(
         row_col, col_col, row_order, col_order, row_title, col_title = pair_specs[pair_name]
         counts = count_matrix(df, row_col, col_col, row_order, col_order)
         row_pct = counts.div(counts.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
+        confidence = None
+        if confidence_col and confidence_col in df.columns and "right" in {row_col, col_col}:
+            confidence = mean_matrix(df, row_col, col_col, confidence_col, row_order, col_order)
+            confidence_path = os.path.join(outdir, f"{prefix}_matrix_{pair_name}_confidence.csv")
+            confidence.to_csv(confidence_path)
+            print(f"[SAVE] {confidence_path}")
         count_path = os.path.join(outdir, f"{prefix}_matrix_{pair_name}_counts.csv")
         row_pct_path = os.path.join(outdir, f"{prefix}_matrix_{pair_name}_row_pct.csv")
         counts.to_csv(count_path)
@@ -439,6 +533,7 @@ def plot_matrix_heatmaps(
             color_scale=color_scale,
             min_count_label=min_count_label,
             min_row_pct_label=min_row_pct_label,
+            confidence=confidence,
         )
 
 
@@ -453,6 +548,26 @@ def count_matrix(
     return counts.reindex(index=row_order, columns=col_order, fill_value=0).astype(int)
 
 
+def mean_matrix(
+    df: pd.DataFrame,
+    row_col: str,
+    col_col: str,
+    value_col: str,
+    row_order: list[str],
+    col_order: list[str],
+) -> pd.DataFrame:
+    values = df.copy()
+    values[value_col] = pd.to_numeric(values[value_col], errors="coerce")
+    means = values.pivot_table(
+        index=row_col,
+        columns=col_col,
+        values=value_col,
+        aggfunc="mean",
+        observed=False,
+    )
+    return means.reindex(index=row_order, columns=col_order)
+
+
 def plot_count_matrix(
     counts: pd.DataFrame,
     row_pct: pd.DataFrame,
@@ -464,6 +579,7 @@ def plot_count_matrix(
     color_scale: str,
     min_count_label: int,
     min_row_pct_label: float,
+    confidence: pd.DataFrame | None = None,
 ) -> None:
     if counts.empty:
         print(f"[WARN] Empty matrix for {row_title} -> {col_title}; skipping.")
@@ -496,17 +612,18 @@ def plot_count_matrix(
         vmax = 1.0
 
     n_rows, n_cols = counts.shape
-    fig_w = max(10, 0.5 * n_cols + 4)
-    fig_h = max(6, 0.42 * n_rows + 2)
+    has_confidence = confidence is not None
+    fig_w = max(12, 0.82 * n_cols + 4)
+    fig_h = max(7, 0.52 * n_rows + 2)
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     im = ax.imshow(color_values, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax)
     if not use_color:
         ax.set_facecolor("white")
         im.set_alpha(0.0)
     ax.set_xticks(np.arange(n_cols))
-    ax.set_xticklabels(counts.columns, rotation=45, ha="right", fontsize=10)
+    ax.set_xticklabels([shorten_matrix_label(label) for label in counts.columns], rotation=45, ha="right", fontsize=10)
     ax.set_yticks(np.arange(n_rows))
-    ax.set_yticklabels(counts.index, fontsize=10)
+    ax.set_yticklabels([shorten_matrix_label(label) for label in counts.index], fontsize=10)
     ax.set_xlabel(col_title)
     ax.set_ylabel(row_title)
     if color_scale == "row_pct":
@@ -526,10 +643,24 @@ def plot_count_matrix(
             pct = float(row_pct.loc[row_name, col_name])
             if count < min_count_label or pct < min_row_pct_label:
                 continue
-            text = matrix_cell_label(count, pct, label_mode)
+            conf = None
+            if confidence is not None:
+                conf_value = confidence.loc[row_name, col_name]
+                if pd.notna(conf_value):
+                    conf = float(conf_value)
+            text = matrix_cell_label(count, pct, label_mode, confidence=conf)
             color_value = float(color_values[i, j])
             text_color = "white" if use_color and vmax > 0 and color_value > 0.50 * vmax else "#17202a"
-            ax.text(j, i, text, ha="center", va="center", fontsize=8.5, fontweight="bold", color=text_color)
+            ax.text(
+                j,
+                i,
+                text,
+                ha="center",
+                va="center",
+                fontsize=8.0 if has_confidence else 8.5,
+                fontweight="bold",
+                color=text_color,
+            )
 
     if use_color:
         cbar = fig.colorbar(im, ax=ax, fraction=0.02, pad=0.02)
@@ -541,12 +672,22 @@ def plot_count_matrix(
     print(f"[SAVE] {path}")
 
 
-def matrix_cell_label(count: int, row_pct: float, label_mode: str) -> str:
+def matrix_cell_label(
+    count: int,
+    row_pct: float,
+    label_mode: str,
+    *,
+    confidence: float | None = None,
+) -> str:
     if label_mode == "count":
-        return f"{count:,}"
-    if label_mode == "row_pct":
-        return f"{row_pct:.0%}"
-    return f"{count:,}\n{row_pct:.0%}"
+        label = f"{count:,}"
+    elif label_mode == "row_pct":
+        label = f"{row_pct:.0%}"
+    else:
+        label = f"{count:,}\n{row_pct:.0%}"
+    if confidence is not None:
+        label = f"{label}\nC={confidence:.1f}"
+    return label
 
 
 def plot_alluvial(
