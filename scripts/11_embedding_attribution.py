@@ -594,8 +594,13 @@ def save_and_plot_mass_selection(
         max_genes=args.selection_max_genes,
         relative_to_top_frac=args.selection_relative_to_top_frac,
     )
-    selected_path = os.path.join(table_dir, "embedding_attribution_mass_selected_genes.csv")
-    summary_path = os.path.join(table_dir, "embedding_attribution_mass_selection_summary.csv")
+    output_prefix = (
+        args.selection_output_prefix
+        if args.selection_output_prefix
+        else "embedding_attribution_mass"
+    )
+    selected_path = os.path.join(table_dir, f"{output_prefix}_selected_genes.csv")
+    summary_path = os.path.join(table_dir, f"{output_prefix}_selection_summary.csv")
     selected.to_csv(selected_path, index=False)
     summary.to_csv(summary_path, index=False)
     print(f"[SAVE] {selected_path}")
@@ -607,6 +612,7 @@ def save_and_plot_mass_selection(
             f"target reached in {int(summary['reached_target_mass'].sum())}/{len(summary)} labels"
         )
     plot_mass_selection_diagnostic(agg_df, summary, fig_dir, args)
+    plot_ranked_attribution_diagnostic(agg_df, summary, fig_dir, args)
 
 
 # ---------------------------------------------------------------------------
@@ -873,6 +879,17 @@ def plot_mass_selection_diagnostic(
         ax.set_yticks([0, 25, 50, 75, 100])
         ax.tick_params(labelsize=10)
         ax.spines[["top", "right"]].set_visible(False)
+        ax.text(
+            0.97,
+            0.08,
+            f"Selected genes: {selected_n}",
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=11,
+            fontweight="bold",
+            color="black",
+        )
 
     fig.suptitle(
         "SIGnature cumulative attribution-mass selection: "
@@ -882,6 +899,93 @@ def plot_mass_selection_diagnostic(
     )
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     _save_fig(fig, fig_dir, "embedding_attribution_gene_selection_diagnostic")
+
+
+def plot_ranked_attribution_diagnostic(
+    agg_df: pd.DataFrame,
+    summary: pd.DataFrame,
+    fig_dir: str,
+    args,
+) -> None:
+    """Plot individual gene attribution values from highest to lowest."""
+    labels = ordered_labels(agg_df)
+    plot_label_key = infer_plot_label_key(args, labels)
+    n_cols = min(ATTRIBUTION_BAR_N_COLS, len(labels))
+    n_rows = ceil(len(labels) / n_cols)
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(6.1 * n_cols, 4.5 * n_rows),
+        squeeze=False,
+    )
+    summary_by_label = summary.assign(
+        _label=summary["label"].astype(str)
+    ).set_index("_label")
+    for ax in axes.ravel():
+        ax.axis("off")
+
+    for ax, label in zip(axes.ravel(), labels):
+        ax.axis("on")
+        ordered = (
+            agg_df.loc[agg_df["label"].astype(str).eq(str(label))]
+            .sort_values(["mean_abs_attr", "gene"], ascending=[False, True])
+            .reset_index(drop=True)
+        )
+        values = ordered["mean_abs_attr"].fillna(0).clip(lower=0).to_numpy(dtype=float)
+        ranks = np.arange(1, len(values) + 1)
+        selected_n = int(summary_by_label.loc[str(label), "n_selected_genes"])
+
+        ax.plot(ranks, values, color="#4c78a8", linewidth=2.0)
+        if selected_n:
+            ax.fill_between(
+                ranks[:selected_n],
+                0,
+                values[:selected_n],
+                color="#4c78a8",
+                alpha=0.12,
+            )
+            ax.axvline(
+                selected_n,
+                color="#b23a48",
+                linestyle="--",
+                linewidth=1.3,
+            )
+            ax.scatter(
+                [selected_n],
+                [values[selected_n - 1]],
+                color="#b23a48",
+                s=28,
+                zorder=4,
+            )
+
+        ax.set_title(
+            format_panel_label(label, plot_label_key),
+            fontsize=12,
+            fontweight="bold",
+        )
+        ax.set_xlabel("Gene rank", fontsize=11, fontweight="bold")
+        ax.set_ylabel("Mean |attribution|", fontsize=11, fontweight="bold")
+        ax.tick_params(labelsize=10)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.text(
+            0.97,
+            0.92,
+            f"Selected genes: {selected_n}",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=11,
+            fontweight="bold",
+            color="black",
+        )
+
+    fig.suptitle(
+        "SIGnature individual gene attribution ranked from highest to lowest",
+        fontsize=18,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    _save_fig(fig, fig_dir, "embedding_attribution_ranked_gene_attribution_diagnostic")
 
 
 def plot_bar(agg_df: pd.DataFrame, fig_dir: str, top_n: int, args) -> None:
@@ -1226,7 +1330,11 @@ def _save_fig(fig, fig_dir: str, stem: str) -> None:
 
 def plot_existing_outputs(table_dir: str, fig_dir: str, args) -> None:
     plotted = 0
-    agg_path = os.path.join(table_dir, "embedding_attribution_per_label.csv")
+    agg_path = (
+        args.existing_attribution_csv
+        if args.existing_attribution_csv
+        else os.path.join(table_dir, "embedding_attribution_per_label.csv")
+    )
     if os.path.exists(agg_path):
         print(f"[LOAD] {agg_path}")
         agg_df = pd.read_csv(agg_path, dtype={"label": str})
@@ -1371,6 +1479,15 @@ def parse_args() -> argparse.Namespace:
         help="Minimum attribution relative to each label's top gene. Default 0.01 (1%%).",
     )
     p.add_argument(
+        "--selection-output-prefix",
+        default=None,
+        help=(
+            "Optional basename for mass-selection CSVs, for example "
+            "embedding_attribution_mass60. The default preserves the existing "
+            "embedding_attribution_mass_* filenames."
+        ),
+    )
+    p.add_argument(
         "--filter-broad-genes",
         action="store_true",
         help="Remove MT-, RPS, RPL, HBB etc. before aggregation and plotting.",
@@ -1412,6 +1529,16 @@ def parse_args() -> argparse.Namespace:
         "--plot-existing",
         action="store_true",
         help="Regenerate figures from existing attribution CSVs in --outdir without rerunning IG.",
+    )
+    p.add_argument(
+        "--existing-attribution-csv",
+        default=None,
+        help=(
+            "Optional existing embedding_attribution_per_label.csv to read while "
+            "writing newly selected genes and figures under --outdir. This allows "
+            "multiple cumulative-mass selections without copying or overwriting "
+            "the original all-gene attribution table."
+        ),
     )
     p.add_argument(
         "--keep-old-figures",

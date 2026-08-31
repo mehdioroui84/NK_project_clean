@@ -1,0 +1,12 @@
+cluster,percent_of_cluster_cells_covered_by_mt_summary,cell_count_weighted_average_mt_percentage,datasets_with_high_mt_percentage,total_datasets_evaluated_for_mt,percent_of_covered_cluster_cells_from_high_mt_datasets
+0,94.298584,0.007244,0,37,0.0
+1,63.267063,2.238677,2,61,0.019795
+2,99.890982,6.395488,4,48,13.969563
+3,99.829806,4.054415,4,57,0.220579
+4,100.0,19.15862,6,7,90.166305
+5,99.974363,2.227158,2,25,0.307719
+6,99.947942,4.993107,5,59,4.83962
+7,100.0,0.629995,0,1,0.0
+8,100.0,0.000934,0,12,0.0
+9,99.949075,3.837757,1,5,0.050951
+10,96.021505,0.012335,0,5,0.0

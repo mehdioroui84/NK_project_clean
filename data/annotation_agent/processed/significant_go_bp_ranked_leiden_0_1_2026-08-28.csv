@@ -1,0 +1,1021 @@
+cluster,pathway_rank,pathway
+0,1,Leukocyte mediated immunity
+0,2,Regulation of hemopoiesis
+0,3,Lymphocyte mediated immunity
+0,4,Leukocyte mediated cytotoxicity
+0,5,Myeloid cell differentiation
+0,6,Response to chemokine
+0,7,Cell chemotaxis
+0,8,Regulation of myeloid cell differentiation
+0,9,Adaptive immune response based on somatic recombination of immune receptors built from immunoglobulin superfamily domains
+0,10,Antimicrobial humoral response
+0,11,Antimicrobial humoral immune response mediated by antimicrobial peptide
+0,12,Natural killer cell chemotaxis
+0,13,Natural killer cell mediated immunity
+0,14,Response to steroid hormone
+0,15,Regulation of leukocyte differentiation
+0,16,Granzyme mediated programmed cell death signaling pathway
+0,17,Alpha beta t cell activation
+0,18,Negative regulation by host of viral transcription
+0,19,Leukocyte chemotaxis
+0,20,Lymphocyte activation involved in immune response
+0,21,Myeloid leukocyte migration
+0,22,Cell activation involved in immune response
+0,23,Granulocyte chemotaxis
+0,24,Regulation of immune effector process
+0,25,Myeloid leukocyte differentiation
+0,26,Lymphocyte differentiation
+0,27,Response to metal ion
+0,28,Positive regulation of lymphocyte chemotaxis
+0,29,T cell activation involved in immune response
+0,30,Eosinophil chemotaxis
+0,31,Immune response regulating cell surface receptor signaling pathway
+0,32,Regulation of chemotaxis
+0,33,Granulocyte migration
+0,34,Positive regulation of cell activation
+0,35,Humoral immune response
+0,36,Negative regulation of cell activation
+0,37,Eosinophil migration
+0,38,Regulation of lymphocyte chemotaxis
+0,39,Regulation of leukocyte migration
+0,40,T cell differentiation
+0,41,Response to tumor necrosis factor
+0,42,Regulation of cell killing
+0,43,Negative regulation of lymphocyte activation
+0,44,Macrophage activation
+0,45,Osteoclast differentiation
+0,46,Positive regulation of tumor necrosis factor superfamily cytokine production
+0,47,Myeloid leukocyte activation
+0,48,Cellular response to metal ion
+0,49,Regulation of inflammatory response
+0,50,Positive regulation of cell killing
+0,51,Regulation of lymphocyte migration
+0,52,Regulation of leukocyte chemotaxis
+0,53,Negative regulation of hemopoiesis
+0,54,Regulation of myeloid leukocyte differentiation
+0,55,Response to molecule of bacterial origin
+0,56,Tumor necrosis factor superfamily cytokine production
+0,57,Response to reactive oxygen species
+0,58,Cd4 positive alpha beta t cell activation
+0,59,Response to calcium ion
+0,60,Positive regulation of chemotaxis
+0,61,Regulation of t cell activation
+0,62,Regulation of adaptive immune response
+0,63,Positive regulation of cytokine production involved in immune response
+0,64,Regulation of mononuclear cell migration
+0,65,Regulation of lymphocyte differentiation
+0,66,Positive regulation of leukocyte migration
+0,67,Positive regulation of lymphocyte migration
+0,68,Response to corticosteroid
+0,69,Mononuclear cell migration
+0,70,Positive regulation of leukocyte chemotaxis
+0,71,Lymphocyte chemotaxis
+0,72,T cell differentiation involved in immune response
+0,73,Regulation of erythrocyte differentiation
+0,74,Natural killer cell activation
+0,75,Homeostasis of number of cells
+0,76,Positive regulation of myeloid cell differentiation
+0,77,Glial cell activation
+0,78,Granulocyte activation
+0,79,Lymphocyte migration
+0,80,Negative regulation of leukocyte apoptotic process
+0,81,Positive regulation of immune effector process
+0,82,T cell mediated cytotoxicity
+0,83,Cellular response to biotic stimulus
+0,84,Positive regulation of protein localization to cell surface
+0,85,Myeloid leukocyte mediated immunity
+0,86,Regulation of innate immune response
+0,87,Negative regulation of cell development
+0,88,B cell mediated immunity
+0,89,Negative regulation of lymphocyte differentiation
+0,90,Positive regulation of myeloid leukocyte differentiation
+0,91,Positive regulation of hemopoiesis
+0,92,B cell activation
+0,93,Cytokine production involved in immune response
+0,94,Response to fibroblast growth factor
+0,95,Response to muscle stretch
+0,96,Negative regulation of adaptive immune response
+0,97,Response to oxidative stress
+0,98,Regulation of osteoclast differentiation
+0,99,Regulation of t helper 17 cell differentiation
+0,100,T cell chemotaxis
+0,101,Negative regulation of cell adhesion
+0,102,Leukocyte cell cell adhesion
+0,103,Antigen processing and presentation of exogenous peptide antigen via mhc class ii
+0,104,Positive regulation of production of molecular mediator of immune response
+0,105,T cell migration
+0,106,Cellular response to calcium ion
+0,107,B cell differentiation
+0,108,Positive regulation of cell development
+0,109,Leukocyte degranulation
+0,110,Neutrophil chemotaxis
+0,111,Negative regulation of sterol transport
+0,112,Positive regulation of leukocyte mediated immunity
+0,113,Regulation of cd4 positive alpha beta t cell activation
+0,114,Erythrocyte homeostasis
+0,115,Negative regulation of leukocyte cell cell adhesion
+0,116,Neuroinflammatory response
+0,117,Positive regulation of myeloid leukocyte cytokine production involved in immune response
+0,118,Gliogenesis
+0,119,Cellular response to molecule of bacterial origin
+0,120,Leukocyte proliferation
+0,121,Muscle cell proliferation
+0,122,Cellular response to interleukin 1
+0,123,Antigen processing and presentation of peptide or polysaccharide antigen via mhc class ii
+0,124,Negative regulation of cd4 positive alpha beta t cell activation
+0,125,Negative regulation of molecular function
+0,126,Fc gamma receptor signaling pathway
+0,127,Positive regulation of inflammatory response
+0,128,Negative regulation of lymphocyte apoptotic process
+0,129,Regulation of t helper 17 type immune response
+0,130,Response to lipoprotein particle
+0,131,Regulation of leukocyte mediated immunity
+0,132,Pyroptotic inflammatory response
+0,133,Antigen processing and presentation of exogenous peptide antigen
+0,134,T helper 17 cell differentiation
+0,135,Positive regulation of mononuclear cell migration
+0,136,Positive regulation of smooth muscle cell proliferation
+0,137,Regulation of leukocyte apoptotic process
+0,138,Smooth muscle cell proliferation
+0,139,Interleukin 6 production
+0,140,Response to toxic substance
+0,141,Regulation of protein localization to cell surface
+0,142,Negative regulation of myeloid cell differentiation
+0,143,Positive regulation of interleukin 6 production
+0,144,Response to hydrogen peroxide
+0,145,Innate immune response activating cell surface receptor signaling pathway
+0,146,Positive regulation of nitric oxide metabolic process
+0,147,Regulation of natural killer cell activation
+0,148,Regulation of leukocyte proliferation
+0,149,Neutrophil migration
+0,150,Cellular response to lipoprotein particle stimulus
+0,151,Positive regulation of leukocyte cell cell adhesion
+0,152,Negative regulation of cytokine production
+0,153,Cd4 positive alpha beta t cell differentiation
+0,154,Protein import
+0,155,Positive regulation of calcium ion transport
+0,156,Regulation of t cell mediated cytotoxicity
+0,157,Positive regulation of monoatomic ion transport
+0,158,Response to tumor cell
+0,159,Antigen processing and presentation of exogenous antigen
+0,160,Negative regulation of alpha beta t cell activation
+0,161,Regulation of t helper cell differentiation
+0,162,Forebrain development
+0,163,Positive regulation of nuclear transcribed mrna catabolic process deadenylation dependent decay
+0,164,Response to granulocyte macrophage colony stimulating factor
+0,165,Type ii hypersensitivity
+0,166,Integrated stress response signaling
+0,167,Positive t cell selection
+0,168,Regulation of lymphocyte mediated immunity
+0,169,Cellular defense response
+0,170,Leukocyte activation involved in inflammatory response
+0,171,Myeloid leukocyte cytokine production
+0,172,Negative regulation of lipid transport
+0,173,Regulation of t cell migration
+0,174,Response to epidermal growth factor
+0,175,Regulation of epithelial cell proliferation
+0,176,Response to interleukin 1
+0,177,Regulation of granulocyte chemotaxis
+0,178,Natural killer cell degranulation
+0,179,Negative regulation of long term synaptic potentiation
+0,180,Negative regulation of t cell differentiation
+0,181,Monocyte chemotaxis
+0,182,T helper 17 type immune response
+0,183,Response to virus
+0,184,Regulation of endocytosis
+0,185,Regulation of alpha beta t cell activation
+0,186,Antigen receptor mediated signaling pathway
+0,187,Phospholipid efflux
+0,188,Negative regulation of cell cell adhesion
+0,189,Positive regulation of response to biotic stimulus
+0,190,Leukocyte apoptotic process
+0,191,Response to type ii interferon
+0,192,Negative regulation of cell fate commitment
+0,193,Positive regulation by symbiont of entry into host
+0,194,Regulation of t cell chemotaxis
+0,195,Regulation of t helper 17 cell lineage commitment
+0,196,Erk1 and erk2 cascade
+0,197,Type i interferon production
+0,198,Fc receptor signaling pathway
+0,199,Response to mechanical stimulus
+0,200,Regulation of macrophage activation
+0,201,Regulation of protein import into nucleus
+0,202,Negative regulation of t helper 17 type immune response
+0,203,Negative regulation of immune effector process
+0,204,Regulation of b cell activation
+0,205,Response to light stimulus
+0,206,Positive regulation of cell cell adhesion
+0,207,Interferon beta production
+0,208,Positive regulation of viral process
+0,209,Regulation of cd4 positive alpha beta t cell differentiation
+0,210,Regulation of lymphocyte apoptotic process
+0,211,T cell mediated immunity
+0,212,Negative regulation of triglyceride metabolic process
+0,213,Alpha beta t cell differentiation
+0,214,Regulation of viral process
+0,215,Interleukin 10 production
+0,216,Positive regulation of type 2 immune response
+0,217,Protein localization to cell surface
+1,1,Leukocyte mediated cytotoxicity
+1,2,Regulation of hemopoiesis
+1,3,Lymphocyte mediated immunity
+1,4,Oxidative phosphorylation
+1,5,ATP synthesis coupled electron transport
+1,6,Leukocyte mediated immunity
+1,7,Electron transport chain
+1,8,Natural killer cell mediated immunity
+1,9,Proton transmembrane transport
+1,10,Aerobic respiration
+1,11,Cell chemotaxis
+1,12,Response to steroid hormone
+1,13,Natural killer cell chemotaxis
+1,14,Regulation of myeloid cell differentiation
+1,15,Granzyme mediated programmed cell death signaling pathway
+1,16,Nucleoside triphosphate biosynthetic process
+1,17,Cellular respiration
+1,18,Adaptive immune response based on somatic recombination of immune receptors built from immunoglobulin superfamily domains
+1,19,Positive regulation of cell activation
+1,20,Positive regulation of chemotaxis
+1,21,ATP biosynthetic process
+1,22,Regulation of leukocyte differentiation
+1,23,Regulation of chemotaxis
+1,24,Regulation of cell killing
+1,25,Positive regulation of cell killing
+1,26,Nucleotide biosynthetic process
+1,27,Regulation of leukocyte migration
+1,28,Proton motive force driven ATP synthesis
+1,29,Granulocyte chemotaxis
+1,30,Positive regulation of lymphocyte chemotaxis
+1,31,Myeloid cell differentiation
+1,32,Regulation of leukocyte chemotaxis
+1,33,T cell differentiation
+1,34,Antimicrobial humoral immune response mediated by antimicrobial peptide
+1,35,Regulation of immune effector process
+1,36,Response to calcium ion
+1,37,Mitochondrial electron transport NADH to ubiquinone
+1,38,Response to chemokine
+1,39,Energy derivation by oxidation of organic compounds
+1,40,Response to metal ion
+1,41,Regulation of lymphocyte chemotaxis
+1,42,Chromosome segregation
+1,43,Lymphocyte differentiation
+1,44,Response to oxygen levels
+1,45,Granulocyte migration
+1,46,Regulation of mononuclear cell migration
+1,47,Positive regulation of leukocyte chemotaxis
+1,48,Positive regulation of leukocyte migration
+1,49,Response to corticosteroid
+1,50,Gamma delta t cell activation
+1,51,T cell mediated cytotoxicity
+1,52,Regulation of adaptive immune response
+1,53,Natural killer cell activation
+1,54,Positive regulation of myeloid leukocyte differentiation
+1,55,Positive regulation of myeloid cell differentiation
+1,56,Lymphocyte activation involved in immune response
+1,57,Leukocyte chemotaxis
+1,58,Myeloid leukocyte migration
+1,59,Sister chromatid segregation
+1,60,Positive regulation of leukocyte proliferation
+1,61,Regulation of t cell activation
+1,62,Nucleoside phosphate biosynthetic process
+1,63,Osteoclast differentiation
+1,64,Negative regulation of adaptive immune response
+1,65,Response to tumor necrosis factor
+1,66,Regulation of lymphocyte migration
+1,67,Cell activation involved in immune response
+1,68,Nuclear chromosome segregation
+1,69,Ribose phosphate biosynthetic process
+1,70,Antimicrobial humoral response
+1,71,Myeloid leukocyte differentiation
+1,72,Myeloid leukocyte activation
+1,73,Purine nucleotide biosynthetic process
+1,74,Negative regulation by host of viral transcription
+1,75,Regulation of myeloid leukocyte differentiation
+1,76,Cd4 positive alpha beta t cell activation
+1,77,Positive regulation of hemopoiesis
+1,78,Leukocyte proliferation
+1,79,Alpha beta t cell activation
+1,80,T cell activation involved in immune response
+1,81,Regulation of viral process
+1,82,Regulation of cd4 positive alpha beta t cell activation
+1,83,Positive regulation of lymphocyte migration
+1,84,Nucleoside triphosphate metabolic process
+1,85,Regulation of leukocyte proliferation
+1,86,Regulation of natural killer cell activation
+1,87,Positive regulation of leukocyte cell cell adhesion
+1,88,Chromosome condensation
+1,89,Immune response regulating cell surface receptor signaling pathway
+1,90,Lymphocyte chemotaxis
+1,91,Regulation of t cell mediated cytotoxicity
+1,92,Generation of precursor metabolites and energy
+1,93,Positive t cell selection
+1,94,Positive regulation of leukocyte mediated immunity
+1,95,Positive regulation of mononuclear cell migration
+1,96,Regulation of lymphocyte differentiation
+1,97,Regulation of erythrocyte differentiation
+1,98,Regulation of granulocyte chemotaxis
+1,99,Mononuclear cell migration
+1,100,ATP metabolic process
+1,101,Eosinophil chemotaxis
+1,102,Granulocyte activation
+1,103,Mitochondrial electron transport cytochrome c to oxygen
+1,104,Positive regulation of protein localization to cell surface
+1,105,Response to lectin
+1,106,Negative regulation of lymphocyte activation
+1,107,Lymphocyte migration
+1,108,Positive regulation of cell cell adhesion
+1,109,Leukocyte cell cell adhesion
+1,110,Response to virus
+1,111,Regulation of viral life cycle
+1,112,Eosinophil migration
+1,113,Purine containing compound biosynthetic process
+1,114,Macrophage activation
+1,115,Positive regulation of tumor necrosis factor superfamily cytokine production
+1,116,Cellular response to metal ion
+1,117,Negative regulation of lymphocyte differentiation
+1,118,Positive regulation of viral process
+1,119,Regulation of leukocyte mediated immunity
+1,120,Response to xenobiotic stimulus
+1,121,Regulation of mitotic nuclear division
+1,122,Regulation of alpha beta t cell activation
+1,123,Positive regulation of macrophage migration
+1,124,Positive regulation of immune effector process
+1,125,Mitotic sister chromatid segregation
+1,126,Protein refolding
+1,127,Regulation of t helper 17 cell differentiation
+1,128,T cell chemotaxis
+1,129,Negative regulation of hemopoiesis
+1,130,Positive regulation of osteoclast differentiation
+1,131,Regulation of lymphocyte mediated immunity
+1,132,Tumor necrosis factor superfamily cytokine production
+1,133,Protein polymerization
+1,134,Mitotic nuclear division
+1,135,Negative regulation of cell development
+1,136,Regulation of osteoclast differentiation
+1,137,Antigen processing and presentation of exogenous peptide antigen via mhc class ii
+1,138,Regulation of chromosome segregation
+1,139,Negative regulation of immune effector process
+1,140,Negative regulation of t cell mediated immunity
+1,141,T cell mediated immunity
+1,142,T cell migration
+1,143,Cellular response to calcium ion
+1,144,Nucleotide metabolic process
+1,145,Humoral immune response
+1,146,Chromosome separation
+1,147,Leukocyte degranulation
+1,148,Neutrophil chemotaxis
+1,149,Response to progesterone
+1,150,Regulation of nuclear division
+1,151,Response to ketone
+1,152,Antigen processing and presentation of peptide or polysaccharide antigen via mhc class ii
+1,153,Negative regulation of cd4 positive alpha beta t cell activation
+1,154,Response to mechanical stimulus
+1,155,Negative regulation of cell activation
+1,156,Fc gamma receptor signaling pathway
+1,157,Positive regulation of cytokine production involved in immune response
+1,158,Regulation of t helper 17 type immune response
+1,159,Cell adhesion mediated by integrin
+1,160,T cell differentiation in thymus
+1,161,Antigen processing and presentation of exogenous peptide antigen
+1,162,T helper 17 cell differentiation
+1,163,DNA topological change
+1,164,Negative regulation of t cell mediated cytotoxicity
+1,165,Positive regulation of cd4 positive alpha beta t cell proliferation
+1,166,Positive regulation of monocyte differentiation
+1,167,Regulation of chromosome organization
+1,168,Macrophage chemotaxis
+1,169,NADH dehydrogenase complex assembly
+1,170,Regulation of protein localization to cell surface
+1,171,Positive regulation of inflammatory response
+1,172,Positive regulation of glial cell migration
+1,173,Regulation of cell cell adhesion mediated by integrin
+1,174,T cell differentiation involved in immune response
+1,175,Positive regulation of cell development
+1,176,Regulation of inflammatory response
+1,177,Osteoclast proliferation
+1,178,Positive regulation of nuclear transcribed mrna catabolic process deadenylation dependent decay
+1,179,Response to granulocyte macrophage colony stimulating factor
+1,180,Type ii hypersensitivity
+1,181,Innate immune response activating cell surface receptor signaling pathway
+1,182,Regulation of macrophage migration
+1,183,Regulation of mitotic cell cycle phase transition
+1,184,Homeostasis of number of cells
+1,185,Neutrophil migration
+1,186,Response to nicotine
+1,187,Response to tumor cell
+1,188,Regulation of cell cycle phase transition
+1,189,Osteoblast differentiation
+1,190,Regulation of sister chromatid segregation
+1,191,Regulation of t cell mediated immunity
+1,192,Natural killer cell degranulation
+1,193,Negative t cell selection
+1,194,Antigen processing and presentation of exogenous antigen
+1,195,Negative regulation of alpha beta t cell activation
+1,196,Regulation of t helper cell differentiation
+1,197,Positive regulation of t cell proliferation
+1,198,Response to alcohol
+1,199,Positive regulation of calcium ion transport
+1,200,Cellular defense response
+1,201,Regulation of t cell migration
+1,202,Response to epidermal growth factor
+2,1,Oxidative phosphorylation
+2,2,ATP synthesis coupled electron transport
+2,3,Proton transmembrane transport
+2,4,Electron transport chain
+2,5,Aerobic respiration
+2,6,Cellular respiration
+2,7,T cell differentiation
+2,8,Positive regulation of cell activation
+2,9,Regulation of t cell activation
+2,10,ATP metabolic process
+2,11,ATP biosynthetic process
+2,12,Protein refolding
+2,13,Lymphocyte differentiation
+2,14,Energy derivation by oxidation of organic compounds
+2,15,Nucleoside triphosphate metabolic process
+2,16,Nucleoside triphosphate biosynthetic process
+2,17,Proton motive force driven ATP synthesis
+2,18,Positive regulation of leukocyte cell cell adhesion
+2,19,Alpha beta t cell activation
+2,20,Positive thymic t cell selection
+2,21,T cell differentiation in thymus
+2,22,Cell chemotaxis
+2,23,Regulation of hemopoiesis
+2,24,Positive regulation of cell cell adhesion
+2,25,Mitochondrial electron transport NADH to ubiquinone
+2,26,Response to oxygen levels
+2,27,Generation of precursor metabolites and energy
+2,28,Ribose phosphate biosynthetic process
+2,29,Thymic t cell selection
+2,30,Ribose phosphate metabolic process
+2,31,Purine nucleotide biosynthetic process
+2,32,Regulation of lymphocyte apoptotic process
+2,33,Regulation of chemotaxis
+2,34,Chaperone mediated protein folding
+2,35,Inclusion body assembly
+2,36,Leukocyte cell cell adhesion
+2,37,De novo post translational protein folding
+2,38,Nucleotide biosynthetic process
+2,39,Regulation of lymphocyte differentiation
+2,40,Positive regulation of chemotaxis
+2,41,Natural killer cell chemotaxis
+2,42,Granzyme mediated programmed cell death signaling pathway
+2,43,De novo protein folding
+2,44,Lymphocyte apoptotic process
+2,45,Leukocyte mediated cytotoxicity
+2,46,Negative regulation of lymphocyte apoptotic process
+2,47,Response to chemokine
+2,48,Purine containing compound biosynthetic process
+2,49,Negative regulation of inclusion body assembly
+2,50,Nucleotide metabolic process
+2,51,Lymphocyte mediated immunity
+2,52,Regulation of leukocyte apoptotic process
+2,53,Response to heat
+2,54,Positive t cell selection
+2,55,Positive regulation of lymphocyte chemotaxis
+2,56,Negative regulation of leukocyte apoptotic process
+2,57,Nucleoside phosphate biosynthetic process
+2,58,Leukocyte apoptotic process
+2,59,Positive regulation of interleukin 8 production
+2,60,Regulation of inclusion body assembly
+2,61,Antimicrobial humoral immune response mediated by antimicrobial peptide
+2,62,Cd4 positive alpha beta t cell activation
+2,63,Cellular response to heat
+2,64,Mitochondrial electron transport cytochrome c to oxygen
+2,65,Regulation of leukocyte differentiation
+2,66,Leukocyte mediated immunity
+2,67,Positive regulation of lymphocyte differentiation
+2,68,Leukocyte proliferation
+2,69,Positive regulation of response to cytokine stimulus
+2,70,Negative regulation of t cell apoptotic process
+2,71,Regulation of lymphocyte chemotaxis
+2,72,Gamma delta t cell activation
+2,73,Adaptive immune response based on somatic recombination of immune receptors built from immunoglobulin superfamily domains
+2,74,Response to temperature stimulus
+2,75,Antimicrobial humoral response
+2,76,Positive regulation of leukocyte chemotaxis
+2,77,Interleukin 8 production
+2,78,Positive regulation of hemopoiesis
+2,79,Regulation of protein polymerization
+2,80,NADH dehydrogenase complex assembly
+2,81,Regulation of t cell apoptotic process
+2,82,Regulation of response to cytokine stimulus
+2,83,Positive regulation of myeloid cell differentiation
+2,84,Positive regulation of lymphocyte migration
+2,85,Regulation of cell killing
+2,86,Response to steroid hormone
+2,87,Lymphocyte chemotaxis
+2,88,Regulation of t cell mediated cytotoxicity
+2,89,Response to metal ion
+2,90,Granulocyte chemotaxis
+2,91,Positive regulation of cd4 positive alpha beta t cell proliferation
+2,92,Regulation of nucleotide binding oligomerization domain containing 2 signaling pathway
+2,93,Regulation of myeloid cell differentiation
+2,94,Regulation of leukocyte chemotaxis
+2,95,Leukocyte chemotaxis
+2,96,Regulation of erythrocyte differentiation
+2,97,Regulation of granulocyte chemotaxis
+2,98,Regulation of cell cell adhesion mediated by integrin
+2,99,Symbiont entry into host
+2,100,Response to calcium ion
+2,101,T cell mediated cytotoxicity
+2,102,Negative t cell selection
+2,103,T cell apoptotic process
+2,104,Granulocyte migration
+2,105,Negative regulation by host of viral transcription
+2,106,Positive regulation of leukocyte migration
+2,107,T cell receptor signaling pathway
+2,108,Response to oxidative stress
+2,109,Positive regulation of endothelial cell chemotaxis
+2,110,Regulation of nucleotide binding domain leucine rich repeat containing receptor signaling pathway
+2,111,Regulation of t cell chemotaxis
+2,112,Regulation of immune effector process
+2,113,Protein polymerization
+2,114,Hindbrain development
+2,115,Regulation of lymphocyte migration
+2,116,Positive regulation of tumor necrosis factor mediated signaling pathway
+2,117,Response to topologically incorrect protein
+2,118,Response to virus
+2,119,Cell cell adhesion mediated by integrin
+2,120,Positive regulation of type 2 immune response
+2,121,Positive regulation of cell development
+2,122,Positive regulation of leukocyte proliferation
+2,123,Regulation of microtubule nucleation
+2,124,Response to hyperoxia
+2,125,Humoral immune response
+2,126,Biological process involved in interaction with host
+3,1,Oxidative phosphorylation
+3,2,ATP synthesis coupled electron transport
+3,3,Proton transmembrane transport
+3,4,Electron transport chain
+3,5,Aerobic respiration
+3,6,Cellular respiration
+3,7,Leukocyte mediated cytotoxicity
+3,8,Energy derivation by oxidation of organic compounds
+3,9,ATP biosynthetic process
+3,10,Leukocyte mediated immunity
+3,11,Lymphocyte mediated immunity
+3,12,Granzyme mediated programmed cell death signaling pathway
+3,13,Nucleoside triphosphate biosynthetic process
+3,14,Proton motive force driven ATP synthesis
+3,15,Natural killer cell mediated immunity
+3,16,Generation of precursor metabolites and energy
+3,17,Mitochondrial electron transport NADH to ubiquinone
+3,18,Ribose phosphate biosynthetic process
+3,19,Purine nucleotide biosynthetic process
+3,20,Nucleotide biosynthetic process
+3,21,ATP metabolic process
+3,22,Response to oxygen levels
+3,23,Purine containing compound biosynthetic process
+3,24,Nucleoside triphosphate metabolic process
+3,25,Regulation of immune effector process
+3,26,Negative regulation by host of viral transcription
+3,27,Regulation of hemopoiesis
+3,28,Regulation of cell killing
+3,29,Nucleoside phosphate biosynthetic process
+3,30,Response to steroid hormone
+3,31,Response to metal ion
+3,32,Lymphocyte activation involved in immune response
+3,33,Response to calcium ion
+3,34,Ribose phosphate metabolic process
+3,35,Mitochondrial electron transport cytochrome c to oxygen
+3,36,Positive regulation of protein localization to cell surface
+3,37,Adaptive immune response based on somatic recombination of immune receptors built from immunoglobulin superfamily domains
+3,38,Myeloid leukocyte activation
+3,39,Positive regulation of cell killing
+3,40,Response to corticosteroid
+3,41,Positive regulation of cell activation
+3,42,Positive regulation of immune effector process
+3,43,Positive regulation of cytokine production involved in immune response
+3,44,Antigen processing and presentation of exogenous peptide antigen via mhc class ii
+3,45,Antimicrobial humoral response
+3,46,Myeloid cell differentiation
+3,47,Cell activation involved in immune response
+3,48,Cell chemotaxis
+3,49,T cell differentiation
+3,50,Positive regulation of hemopoiesis
+3,51,Tumor necrosis factor superfamily cytokine production
+3,52,Positive regulation of interleukin 6 production
+3,53,Antigen processing and presentation of peptide or polysaccharide antigen via mhc class ii
+3,54,Positive regulation of myeloid leukocyte cytokine production involved in immune response
+3,55,Fc gamma receptor signaling pathway
+3,56,Nucleotide metabolic process
+3,57,Natural killer cell activation
+3,58,Regulation of leukocyte differentiation
+3,59,Regulation of chemotaxis
+3,60,Antigen processing and presentation of exogenous peptide antigen
+3,61,NADH dehydrogenase complex assembly
+3,62,Regulation of protein localization to cell surface
+3,63,Macrophage activation
+3,64,Positive regulation of tumor necrosis factor superfamily cytokine production
+3,65,Regulation of myeloid cell differentiation
+3,66,Regulation of natural killer cell activation
+3,67,Granulocyte chemotaxis
+3,68,Myeloid leukocyte mediated immunity
+3,69,Leukocyte chemotaxis
+3,70,Myeloid leukocyte migration
+3,71,Regulation of leukocyte chemotaxis
+3,72,Response to tumor cell
+3,73,Response to tumor necrosis factor
+3,74,Antigen processing and presentation of exogenous antigen
+3,75,Cytokine production involved in immune response
+3,76,Cellular defense response
+3,77,Myeloid leukocyte cytokine production
+3,78,Response to epidermal growth factor
+3,79,Antimicrobial humoral immune response mediated by antimicrobial peptide
+3,80,Natural killer cell chemotaxis
+3,81,Myeloid leukocyte differentiation
+3,82,T cell activation involved in immune response
+3,83,Cellular response to glucocorticoid stimulus
+3,84,Response to oxidative stress
+3,85,Regulation of viral process
+3,86,Regulation of leukocyte mediated immunity
+3,87,Granulocyte activation
+3,88,Positive regulation of chemotaxis
+3,89,Positive regulation of production of molecular mediator of immune response
+3,90,Negative regulation of leukocyte apoptotic process
+3,91,Granulocyte migration
+3,92,T cell mediated cytotoxicity
+3,93,Positive regulation of nuclear transcribed mrna catabolic process deadenylation dependent decay
+3,94,Response to granulocyte macrophage colony stimulating factor
+3,95,Type ii hypersensitivity
+3,96,Fc receptor signaling pathway
+3,97,Lymphocyte differentiation
+3,98,Positive regulation of myeloid leukocyte differentiation
+3,99,Positive regulation of viral process
+3,100,Natural killer cell degranulation
+3,101,Positive regulation of leukocyte mediated immunity
+3,102,Response to xenobiotic stimulus
+3,103,Positive regulation of leukocyte cell cell adhesion
+3,104,Cellular response to corticosteroid stimulus
+3,105,Protein localization to cell surface
+3,106,Positive regulation by symbiont of entry into host
+3,107,Humoral immune response
+3,108,Antigen processing and presentation of peptide antigen
+3,109,Interleukin 6 production
+3,110,Leukocyte degranulation
+3,111,3 utr mediated mrna destabilization
+3,112,Positive regulation of lymphocyte chemotaxis
+3,113,Response to hyperoxia
+3,114,Positive regulation of cell cell adhesion
+3,115,Regulation of lymphocyte mediated immunity
+3,116,T cell differentiation in thymus
+3,117,Eosinophil chemotaxis
+3,118,Hypersensitivity
+3,119,Negative regulation of myeloid cell apoptotic process
+3,120,Neutrophil activation involved in immune response
+3,121,Regulation of viral entry into host cell
+3,122,Negative regulation of DNA binding
+3,123,Positive regulation of myeloid leukocyte mediated immunity
+3,124,Response to chemokine
+3,125,Regulation of fibroblast proliferation
+3,126,Regulation of nuclear transcribed mrna catabolic process deadenylation dependent decay
+3,127,Response to lectin
+3,128,Positive regulation of leukocyte chemotaxis
+3,129,Positive regulation of macrophage cytokine production
+3,130,Regulation of leukocyte apoptotic process
+4,1,Oxidative phosphorylation
+4,2,Proton transmembrane transport
+4,3,ATP synthesis coupled electron transport
+4,4,Aerobic respiration
+4,5,Electron transport chain
+4,6,Cellular respiration
+4,7,Energy derivation by oxidation of organic compounds
+4,8,Generation of precursor metabolites and energy
+4,9,Proton motive force driven ATP synthesis
+4,10,ATP biosynthetic process
+4,11,ATP metabolic process
+4,12,Nucleoside triphosphate biosynthetic process
+4,13,Mitochondrial electron transport NADH to ubiquinone
+4,14,Nucleoside triphosphate metabolic process
+4,15,Ribose phosphate biosynthetic process
+4,16,Purine nucleotide biosynthetic process
+4,17,Ribose phosphate metabolic process
+4,18,Nucleotide biosynthetic process
+4,19,Purine containing compound biosynthetic process
+4,20,Nucleotide metabolic process
+4,21,Nucleoside phosphate biosynthetic process
+4,22,Response to oxygen levels
+4,23,Response to copper ion
+4,24,NADH dehydrogenase complex assembly
+4,25,Mitochondrial respiratory chain complex assembly
+4,26,Response to hyperoxia
+4,27,Response to metal ion
+4,28,Mitochondrial electron transport cytochrome c to oxygen
+4,29,Response to oxidative stress
+4,30,Response to increased oxygen levels
+4,31,Mitochondrion organization
+4,32,Protein refolding
+5,1,ATP synthesis coupled electron transport
+5,2,Oxidative phosphorylation
+5,3,Electron transport chain
+5,4,Proton transmembrane transport
+5,5,Aerobic respiration
+5,6,Regulation of cell killing
+5,7,Response to oxygen levels
+5,8,Leukocyte cell cell adhesion
+5,9,Ribose phosphate metabolic process
+5,10,Positive regulation of cell activation
+5,11,Regulation of leukocyte differentiation
+5,12,Positive regulation of leukocyte cell cell adhesion
+5,13,ATP metabolic process
+5,14,Cellular respiration
+5,15,ATP biosynthetic process
+5,16,Leukocyte mediated cytotoxicity
+5,17,Proton motive force driven ATP synthesis
+5,18,Alpha beta t cell activation
+5,19,Regulation of hemopoiesis
+5,20,T cell differentiation
+5,21,Mitochondrial electron transport NADH to ubiquinone
+5,22,Regulation of t cell activation
+5,23,Positive regulation of cell cell adhesion
+5,24,Nucleoside triphosphate metabolic process
+5,25,Regulation of lymphocyte differentiation
+5,26,Nucleoside triphosphate biosynthetic process
+5,27,Granzyme mediated programmed cell death signaling pathway
+5,28,Ribose phosphate biosynthetic process
+5,29,Cd4 positive alpha beta t cell activation
+5,30,Purine nucleotide biosynthetic process
+5,31,Nucleotide metabolic process
+5,32,Nucleoside phosphate biosynthetic process
+5,33,Purine containing compound biosynthetic process
+5,34,Response to peptide hormone
+5,35,Negative regulation of lymphocyte apoptotic process
+5,36,Response to steroid hormone
+5,37,Generation of precursor metabolites and energy
+5,38,Energy derivation by oxidation of organic compounds
+5,39,Nucleotide biosynthetic process
+5,40,Regulation of alpha beta t cell activation
+6,1,B cell receptor signaling pathway
+6,2,Oxidative phosphorylation
+6,3,ATP synthesis coupled electron transport
+6,4,Antigen receptor mediated signaling pathway
+6,5,B cell activation
+6,6,Electron transport chain
+6,7,Proton transmembrane transport
+6,8,Aerobic respiration
+6,9,Lymphocyte differentiation
+6,10,Immune response regulating cell surface receptor signaling pathway
+6,11,Cellular respiration
+6,12,B cell differentiation
+6,13,ATP biosynthetic process
+6,14,Energy derivation by oxidation of organic compounds
+6,15,Nucleoside triphosphate biosynthetic process
+6,16,Proton motive force driven ATP synthesis
+6,17,Adaptive immune response based on somatic recombination of immune receptors built from immunoglobulin superfamily domains
+6,18,Humoral immune response
+6,19,B cell proliferation
+6,20,Mitochondrial electron transport NADH to ubiquinone
+6,21,Ribose phosphate biosynthetic process
+6,22,Generation of precursor metabolites and energy
+6,23,Purine nucleotide biosynthetic process
+6,24,Regulation of b cell activation
+6,25,Nucleotide biosynthetic process
+6,26,ATP metabolic process
+6,27,Leukocyte proliferation
+6,28,Response to oxygen levels
+6,29,Purine containing compound biosynthetic process
+6,30,Nucleoside triphosphate metabolic process
+6,31,B cell mediated immunity
+6,32,Nucleoside phosphate biosynthetic process
+6,33,Regulation of hemopoiesis
+6,34,Mitochondrial electron transport cytochrome c to oxygen
+6,35,Leukocyte mediated immunity
+6,36,Lymphocyte mediated immunity
+6,37,Ribose phosphate metabolic process
+6,38,Antigen processing and presentation of peptide or polysaccharide antigen via mhc class ii
+6,39,Regulation of immune effector process
+6,40,NADH dehydrogenase complex assembly
+6,41,T cell differentiation
+7,1,Oxygen transport
+7,2,Gas transport
+7,3,Hydrogen peroxide catabolic process
+7,4,Hydrogen peroxide metabolic process
+7,5,Carbon dioxide transport
+7,6,Hemoglobin metabolic process
+7,7,Cellular oxidant detoxification
+7,8,One carbon compound transport
+7,9,Cellular response to toxic substance
+7,10,Reactive oxygen species metabolic process
+7,11,Response to toxic substance
+7,12,Hemoglobin biosynthetic process
+7,13,Erythrocyte homeostasis
+8,1,Leukocyte mediated cytotoxicity
+8,2,Granzyme mediated programmed cell death signaling pathway
+8,3,Natural killer cell mediated immunity
+8,4,Lymphocyte mediated immunity
+8,5,Leukocyte mediated immunity
+8,6,Positive regulation of cell activation
+8,7,Regulation of hemopoiesis
+8,8,T cell differentiation
+8,9,Regulation of leukocyte differentiation
+8,10,Alpha beta t cell activation
+8,11,Natural killer cell activation
+8,12,Lymphocyte activation involved in immune response
+8,13,Regulation of cell killing
+8,14,Regulation of t cell activation
+8,15,Lymphocyte differentiation
+8,16,Cd4 positive alpha beta t cell activation
+8,17,Response to calcium ion
+8,18,Integrated stress response signaling
+8,19,Cellular defense response
+8,20,Cell activation involved in immune response
+8,21,Response to metal ion
+8,22,Cellular response to metal ion
+8,23,Positive regulation of cell killing
+8,24,Natural killer cell degranulation
+9,1,Antimicrobial humoral response
+9,2,Response to oxygen levels
+9,3,Oxidative phosphorylation
+9,4,ATP synthesis coupled electron transport
+9,5,Proton transmembrane transport
+9,6,Electron transport chain
+9,7,Negative regulation of transforming growth factor beta production
+9,8,Aerobic respiration
+9,9,Antimicrobial humoral immune response mediated by antimicrobial peptide
+9,10,Humoral immune response
+9,11,Cellular respiration
+9,12,Response to metal ion
+9,13,Mitochondrial electron transport cytochrome c to oxygen
+10,1,Positive regulation of cell activation
+10,2,Cell chemotaxis
+10,3,T cell differentiation
+10,4,Leukocyte chemotaxis
+10,5,Myeloid leukocyte migration
+10,6,Regulation of hemopoiesis
+10,7,Regulation of leukocyte differentiation
+10,8,Regulation of immune effector process
+10,9,Lymphocyte differentiation
+10,10,Granulocyte chemotaxis
+10,11,Regulation of leukocyte chemotaxis
+10,12,Positive regulation of hemopoiesis
+10,13,Regulation of t cell activation
+10,14,Regulation of chemotaxis
+10,15,Neutrophil chemotaxis
+10,16,Positive regulation of chemotaxis
+10,17,Granulocyte migration
+10,18,Leukocyte cell cell adhesion
+10,19,Regulation of leukocyte migration
+10,20,Positive regulation of leukocyte migration
+10,21,Positive regulation of cell development
+10,22,Positive regulation of cell cell adhesion
+10,23,Positive regulation of leukocyte chemotaxis
+10,24,Neutrophil migration
+10,25,Cellular response to biotic stimulus
+10,26,Positive regulation of immune effector process
+10,27,Positive regulation of leukocyte cell cell adhesion
+10,28,Humoral immune response
+10,29,Antigen processing and presentation of exogenous peptide antigen via mhc class ii
+10,30,Cell activation involved in immune response
+10,31,T cell activation involved in immune response
+10,32,Regulation of lymphocyte differentiation
+10,33,Lymphocyte activation involved in immune response
+10,34,Regulation of mononuclear cell migration
+10,35,Leukocyte proliferation
+10,36,Antigen processing and presentation of peptide or polysaccharide antigen via mhc class ii
+10,37,Regulation of t helper 17 type immune response
+10,38,Antigen processing and presentation of exogenous peptide antigen
+10,39,Positive regulation of mononuclear cell migration
+10,40,Positive regulation of interleukin 6 production
+10,41,Cd4 positive alpha beta t cell differentiation
+10,42,Antigen processing and presentation of exogenous antigen
+10,43,Osteoclast differentiation
+10,44,Alpha beta t cell activation
+10,45,Monocyte chemotaxis
+10,46,T helper 17 type immune response
+10,47,Glial cell activation
+10,48,Granulocyte activation
+10,49,Regulation of alpha beta t cell activation
+10,50,Response to type ii interferon
+10,51,Myeloid cell differentiation
+10,52,Regulation of adaptive immune response
+10,53,Leukocyte mediated immunity
+10,54,Canonical nf kappab signal transduction
+10,55,Regulation of myeloid cell differentiation
+10,56,Antimicrobial humoral immune response mediated by antimicrobial peptide
+10,57,Regulation of cd4 positive alpha beta t cell differentiation
+10,58,Eosinophil chemotaxis
+10,59,Cd4 positive alpha beta t cell activation
+10,60,Mononuclear cell migration
+10,61,Alpha beta t cell differentiation
+10,62,Extrinsic apoptotic signaling pathway
+10,63,Positive regulation of lymphocyte differentiation
+10,64,Antigen processing and presentation of peptide antigen
+10,65,Positive regulation of chemokine production
+10,66,Cellular response to molecule of bacterial origin
+10,67,Response to molecule of bacterial origin
+10,68,Eosinophil migration
+10,69,Myeloid leukocyte differentiation
+10,70,Myeloid leukocyte activation
+10,71,Adaptive immune response based on somatic recombination of immune receptors built from immunoglobulin superfamily domains
+10,72,Positive regulation of leukocyte mediated immunity
+10,73,Response to fungus
+10,74,Modulation by symbiont of entry into host
+10,75,Regulation of alpha beta t cell differentiation
+10,76,Regulation of apoptotic signaling pathway
+10,77,Regulation of t helper 17 cell differentiation
+10,78,Positive regulation of inflammatory response
+10,79,Regulation of cd4 positive alpha beta t cell activation
+10,80,Regulation of leukocyte proliferation
+10,81,Neuroinflammatory response
+10,82,Negative regulation of cell development
+10,83,Positive regulation of cytokine production involved in immune response
+10,84,T cell differentiation in thymus
+10,85,Interleukin 6 production
+10,86,Negative regulation of lymphocyte activation
+10,87,Antimicrobial humoral response
+10,88,Regulation of inflammatory response
+10,89,Positive regulation of interleukin 2 production
+10,90,Chemokine production
+10,91,T helper 17 cell differentiation
+10,92,Mature b cell differentiation
+10,93,Regulation of biological process involved in symbiotic interaction
+10,94,Astrocyte development
+10,95,Positive regulation of lymphocyte migration
+10,96,Response to metal ion
+10,97,Macrophage activation
+10,98,Positive regulation of tumor necrosis factor superfamily cytokine production
+10,99,Regulation of viral life cycle
+10,100,Regulation of p38mapk cascade
+10,101,Superoxide anion generation
+10,102,Positive regulation of canonical nf kappab signal transduction
+10,103,Negative regulation of cell activation
+10,104,Leukocyte apoptotic process
+10,105,Regulation of t helper cell differentiation
+10,106,Negative regulation of hemopoiesis
+10,107,Positive t cell selection
+10,108,Natural killer cell chemotaxis
+10,109,Calcium mediated signaling
+10,110,Cytokine production involved in immune response
+10,111,Dendritic cell differentiation
+10,112,Leukocyte activation involved in inflammatory response
+10,113,Regulation of myeloid leukocyte differentiation
+10,114,Regulation of erythrocyte differentiation
+10,115,Negative regulation of apoptotic signaling pathway
+10,116,Plasma cell differentiation
+10,117,Positive regulation of adaptive immune response
+10,118,Symbiont entry into host
+10,119,Regulation of viral process
+10,120,Positive regulation of calcium mediated signaling
+10,121,Regulation of leukocyte mediated immunity
+10,122,P38mapk cascade
+10,123,Positive regulation of production of molecular mediator of immune response
+10,124,Leukocyte aggregation
+10,125,Positive regulation of interleukin 8 production
+10,126,Actin crosslink formation
+10,127,Negative regulation by host of viral transcription
+10,128,Positive regulation of monocyte chemotactic protein 1 production
+10,129,T cell activation via t cell receptor contact with antigen bound to mhc molecule on antigen presenting cell
+10,130,Interleukin 10 production
+10,131,Interleukin 2 production
+10,132,Cellular response to ethanol
+10,133,Positive regulation by symbiont of entry into host
+10,134,Regulation of unsaturated fatty acid biosynthetic process
+10,135,B cell activation
+10,136,Regulation of dendritic cell differentiation
+10,137,Regulation of monoatomic ion transport
+10,138,Positive chemotaxis
+10,139,Positive regulation of cell killing
+10,140,Regulation of lymphocyte migration
+10,141,Positive regulation of interleukin 1 production
+10,142,Regulation of osteoclast differentiation
+10,143,Regulation of cell cycle phase transition
+10,144,Positive regulation of mapk cascade
+10,145,Superoxide metabolic process
+10,146,Positive regulation of neuroinflammatory response
+10,147,Biological process involved in interaction with host
+10,148,Negative regulation of cell adhesion
+10,149,Regulation of endocytosis
+10,150,Positive regulation of lymphocyte chemotaxis
+10,151,Response to interleukin 17
+10,152,Monocyte chemotactic protein 1 production
+10,153,Positive regulation of t helper 17 type immune response
+10,154,Erk1 and erk2 cascade
+10,155,Lymphocyte apoptotic process
+10,156,Chronic inflammatory response
+10,157,Neutrophil activation involved in immune response
+10,158,Regulation of viral entry into host cell
+10,159,Intrinsic apoptotic signaling pathway
+10,160,Positive regulation of monoatomic ion transport
+10,161,Calcium ion import
+10,162,Positive regulation of myeloid leukocyte mediated immunity
+10,163,Regulation of superoxide anion generation
+10,164,Astrocyte differentiation
+10,165,Cellular response to interleukin 1
+10,166,Positive regulation of erk1 and erk2 cascade
+10,167,Tumor necrosis factor superfamily cytokine production
+10,168,Antifungal innate immune response
+10,169,Response to lectin
+10,170,B cell proliferation
+10,171,Response to chemokine
+10,172,Defense response to bacterium
+10,173,Regulation of fibroblast proliferation
+10,174,Host mediated suppression of symbiont invasion
+10,175,Positive regulation of fatty acid biosynthetic process
+10,176,Regulation of mitotic cell cycle phase transition
+10,177,Homeostasis of number of cells
+10,178,Positive regulation of viral life cycle
+10,179,Regulation of lymphocyte chemotaxis
+10,180,T cell differentiation involved in immune response
+10,181,Negative regulation of cell cell adhesion
+10,182,Regulation of calcium mediated signaling

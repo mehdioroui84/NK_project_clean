@@ -1,0 +1,44 @@
+{
+  "generated_on": "2026-08-28",
+  "processing_rules": {
+    "pathway_filter": "significant_fdr_0_05 == TRUE",
+    "pathway_ranking": "adjusted_p_value ascending, overlap_count descending, gene_ratio descending, pathway ascending",
+    "pathway_delivery_to_agent": "Pathway names are not embedded in cluster context files. The planner retrieves ranked pathway batches on demand from the processed significant-pathway tables.",
+    "maximum_pathways_per_retrieval": 30,
+    "pathway_similarity_interpretation": "No pathway collapsing was performed; the annotation agent is responsible for recognizing related biological pathways.",
+    "attribution_gene_selection": "Cluster-specific smallest ranked SIGnature attribution gene set reaching 50 percent cumulative attribution mass.",
+    "high_mt_percentage_cutoff": 10.0,
+    "mt_percentage_summary": "cell-count-weighted average of supplied cluster-dataset median_mt_percentage values"
+  },
+  "source_file_hashes": {
+    "data/annotation_agent/cluster_qc/leiden_0_1_dataset_mt_percentage_summary.tsv": "4d4ac77a93d3ba524d34ccc7fa5e8d87f1e18cb511bbaa8b0c8a495a3b6e9bad",
+    "data/annotation_agent/cluster_qc/leiden_0_5_dataset_mt_percentage_summary.tsv": "985ce31dbef82607376dca3e079747533e319026f9103e7b9d4f49d2b508cdb2",
+    "data/annotation_agent/gene_attribution/attribution_parent_child_gene_relationship_mass50.csv": "761f8142210fea5caea3f106bd0a14697599dd44b7c2ca78856cea0ad9ca5f41",
+    "data/annotation_agent/pathway_enrichment/go_bp_enrichment_all_leiden05.csv": "e752b95b1f1b5fab991c344cad18c3d9bb6541fbf5783d23ca87aad2ab9010eb",
+    "data/annotation_agent/pathway_enrichment/go_bp_enrichment_leiden01.csv": "b17397e1526cdb99f8a1be82b4b4e3eab3ca8a554b41e59b1681870a1f9018fc",
+    "data/annotation_agent/processed/mitochondrial_context_leiden_0_1_2026-08-28.csv": "22ee052cba53d5638ac3b1ba6b8a0c5a6fde0e31473f1824fc12b6eb8c09a477",
+    "data/annotation_agent/processed/mitochondrial_context_leiden_0_5_2026-08-28.csv": "59f5145e11ee496339e39989ae0165cf3a5a4348f1254010e15f20d9cda31970",
+    "data/annotation_agent/processed/significant_go_bp_ranked_leiden_0_1_2026-08-28.csv": "2687bc456c2c22c6ba58787dba5af44ce205b9d7ad252193964af7736418dfc5",
+    "data/annotation_agent/processed/significant_go_bp_ranked_leiden_0_5_2026-08-28.csv": "2b88c6b77f0c702ed4d1d63c832fe33a959913e433cd56b73ce4aebe0c3cb324",
+    "outputs/leiden_discovery_assay_only/full_leiden_0_1_annotation_worksheet.csv": "d347c4fe33cabd93f62c64be7e15e0d84a520b5dc55a45b1c1ac16d9c610cdd7",
+    "outputs/leiden_discovery_assay_only/full_leiden_0_5_annotation_worksheet.csv": "239d81a141e7e31e23ed9b8632bfffb4c7d01618ab6f99af582c2089b5a02c5f"
+  },
+  "context_file_hashes": {
+    "data/annotation_agent/agent_context/cluster_context_leiden_0_1_2026-08-28.json": "4308534130185dc3b61f2cf6c117dc04fc17a6d809425ca27e2ba1e2f231823e",
+    "data/annotation_agent/agent_context/cluster_context_leiden_0_5_2026-08-28.json": "0486045f2e3ef9e5c4aa5b1c4d0af10409e1cfc610c0d158c15a44cd9c32cd66"
+  },
+  "context_summaries": {
+    "leiden_0_1": {
+      "clusters": 11,
+      "cells": 311471,
+      "clusters_with_significant_pathways": 11,
+      "mass50_attribution_genes": 612
+    },
+    "leiden_0_5": {
+      "clusters": 26,
+      "cells": 311471,
+      "clusters_with_significant_pathways": 25,
+      "mass50_attribution_genes": 1610
+    }
+  }
+}
